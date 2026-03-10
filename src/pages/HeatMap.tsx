@@ -131,32 +131,31 @@ export default function HeatMap() {
         <div className="lg:col-span-3">
           <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
             <h3 className="text-white font-semibold text-sm mb-4">Court View — Click to Add Points</h3>
-            <div
-              ref={courtRef}
-              onClick={handleCourtClick}
-              className="relative w-full bg-green-900 rounded-lg overflow-hidden cursor-crosshair select-none"
-              style={{ paddingBottom: '60%' }}
-            >
+            {/* Vertical court: long sides left/right (sidelines), short sides top/bottom (end lines), net horizontal */}
+            <div className="flex justify-center">
+              <div
+                ref={courtRef}
+                onClick={handleCourtClick}
+                className="relative bg-green-900 rounded-lg overflow-hidden cursor-crosshair select-none"
+                style={{ width: 'min(280px, 100%)', aspectRatio: '1 / 2' }}
+              >
               {/* Court lines */}
               <div className="absolute inset-0">
-                {/* Outer boundary */}
+                {/* Outer boundary (end lines top/bottom, sidelines left/right) */}
                 <div className="absolute inset-[2%] border-2 border-white/60 rounded" />
-                {/* Center net */}
-                <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-white/80" />
-                {/* Center line vertical */}
-                <div className="absolute top-[2%] bottom-[2%] left-1/2 -translate-x-1/2 w-px bg-white/40" />
-                {/* Service boxes */}
-                <div className="absolute top-[2%] bottom-1/2 left-[2%] right-1/2 border border-white/30" />
-                <div className="absolute top-[2%] bottom-1/2 left-1/2 right-[2%] border border-white/30" />
-                <div className="absolute top-1/2 bottom-[2%] left-[2%] right-1/2 border border-white/30" />
-                <div className="absolute top-1/2 bottom-[2%] left-1/2 right-[2%] border border-white/30" />
-                {/* Net label */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/80 text-green-900 text-xs font-bold px-2 py-0.5 rounded">
+                {/* Net — horizontal across the middle */}
+                <div className="absolute left-[2%] right-[2%] top-1/2 -translate-y-1/2 h-[3px] bg-white/90" />
+                {/* Top attack line — 3 m from net = 1/3 from top */}
+                <div className="absolute left-[2%] right-[2%] top-1/3 h-px bg-white/50" />
+                {/* Bottom attack line — 3 m from net = 1/3 from bottom */}
+                <div className="absolute left-[2%] right-[2%] top-2/3 h-px bg-white/50" />
+                {/* NET label */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/80 text-green-900 text-xs font-bold px-2 py-0.5 rounded pointer-events-none">
                   NET
                 </div>
                 {/* Team labels */}
-                <div className="absolute top-[5%] left-1/2 -translate-x-1/2 text-white/50 text-xs font-medium">AWAY</div>
-                <div className="absolute bottom-[5%] left-1/2 -translate-x-1/2 text-white/50 text-xs font-medium">HOME</div>
+                <div className="absolute top-[4%] left-1/2 -translate-x-1/2 text-white/50 text-xs font-medium pointer-events-none">AWAY</div>
+                <div className="absolute bottom-[4%] left-1/2 -translate-x-1/2 text-white/50 text-xs font-medium pointer-events-none">HOME</div>
               </div>
 
               {/* Heat map points */}
@@ -176,6 +175,7 @@ export default function HeatMap() {
               ))}
 
               {/* Tooltip placeholder — wire up onMouseEnter/Leave per point to enable */}
+              </div>
             </div>
           </div>
 
