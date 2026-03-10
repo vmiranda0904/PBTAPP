@@ -1,8 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useAuth } from './AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Placement = '1st' | '2nd' | '3rd' | '4th' | 'participant' | null;
+
+export type SportType = 'indoor' | 'beach';
+
+export type ClipDuration = 10 | 20 | 30 | 60;
+
+export interface Clip {
+  id: string;
+  streamId: string;
+  streamTitle: string;
+  duration: ClipDuration;
+  createdAt: string; // ISO date string
+  createdBy: string; // player ID
+  label: string;
+}
 
 export interface Player {
   id: string;
@@ -208,7 +223,10 @@ interface AppContextType {
   events: CalendarEvent[];
   heatMapPoints: HeatMapPoint[];
   tournamentResults: TournamentResult[];
+  clips: Clip[];
   currentUserId: string;
+  sportType: SportType;
+  setSportType: (type: SportType) => void;
 
   sendMessage: (content: string, channel: string) => void;
   addEvent: (event: Omit<CalendarEvent, 'id'>) => void;
@@ -216,11 +234,16 @@ interface AppContextType {
   recordTournamentResult: (playerId: string, tournamentName: string, placement: Placement, date: string) => void;
   addHeatMapPoint: (point: Omit<HeatMapPoint, 'value'> & { value?: number }) => void;
   updatePlayerStats: (playerId: string, stats: Partial<Player['stats']>) => void;
+  saveClip: (streamId: string, streamTitle: string, duration: ClipDuration) => void;
+  deleteClip: (clipId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? 'p1';
+
   const [players, setPlayers] = useState<Player[]>(() => {
     const saved = localStorage.getItem('pbt_players');
     return saved ? JSON.parse(saved) : SAMPLE_PLAYERS;
@@ -238,13 +261,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('pbt_results');
     return saved ? JSON.parse(saved) : SAMPLE_RESULTS;
   });
-
-  const currentUserId = 'p1'; // Logged-in user
+  const [clips, setClips] = useState<Clip[]>(() => {
+    const saved = localStorage.getItem('pbt_clips');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [sportType, setSportType] = useState<SportType>(() => {
+    const stored = localStorage.getItem('pbt_sport_type');
+    return (stored === 'indoor' || stored === 'beach') ? stored : 'indoor';
+  });
 
   useEffect(() => { localStorage.setItem('pbt_players', JSON.stringify(players)); }, [players]);
   useEffect(() => { localStorage.setItem('pbt_messages', JSON.stringify(messages)); }, [messages]);
   useEffect(() => { localStorage.setItem('pbt_events', JSON.stringify(events)); }, [events]);
   useEffect(() => { localStorage.setItem('pbt_results', JSON.stringify(tournamentResults)); }, [tournamentResults]);
+  useEffect(() => { localStorage.setItem('pbt_clips', JSON.stringify(clips)); }, [clips]);
+  useEffect(() => { localStorage.setItem('pbt_sport_type', sportType); }, [sportType]);
 
   const sendMessage = useCallback((content: string, channel: string) => {
     const sender = players.find(p => p.id === currentUserId);
@@ -312,11 +343,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ));
   }, []);
 
+  const saveClip = useCallback((streamId: string, streamTitle: string, duration: ClipDuration) => {
+    const newClip: Clip = {
+      id: `clip${Date.now()}`,
+      streamId,
+      streamTitle,
+      duration,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUserId,
+      label: `${streamTitle} – last ${duration}s`,
+    };
+    setClips(prev => [newClip, ...prev]);
+  }, [currentUserId]);
+
+  const deleteClip = useCallback((clipId: string) => {
+    setClips(prev => prev.filter(c => c.id !== clipId));
+  }, []);
+
   return (
     <AppContext.Provider value={{
-      players, messages, events, heatMapPoints, tournamentResults, currentUserId,
+      players, messages, events, heatMapPoints, tournamentResults, clips,
+      currentUserId, sportType, setSportType,
       sendMessage, addEvent, recordPracticeAttendance, recordTournamentResult,
-      addHeatMapPoint, updatePlayerStats,
+      addHeatMapPoint, updatePlayerStats, saveClip, deleteClip,
     }}>
       {children}
     </AppContext.Provider>
