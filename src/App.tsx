@@ -11,6 +11,7 @@ import Calendar from './pages/Calendar';
 import Points from './pages/Points';
 import Rankings from './pages/Rankings';
 import Login from './pages/Login';
+import ApproveUser from './pages/ApproveUser';
 
 function AuthRedirect() {
   const { isAuthenticated } = useAuth();
@@ -47,6 +48,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<AuthRedirect />} />
+          <Route path="/approve" element={<ApproveUser />} />
           <Route path="/*" element={<ProtectedApp />} />
         </Routes>
       </BrowserRouter>
