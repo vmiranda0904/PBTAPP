@@ -5,7 +5,7 @@ import {
   verifyPassword,
   type RegisteredUser,
 } from '../lib/userService';
-import { send as emailjsSend } from '@emailjs/browser';
+import { sendApprovalEmail } from '../lib/emailService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,37 +41,9 @@ interface AuthContextType {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'pbt_auth_user';
-const APP_URL = (import.meta.env.VITE_APP_URL as string | undefined) ?? window.location.origin;
-const BASE_PATH = import.meta.env.BASE_URL ?? '/';
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '';
-const EMAILJS_SERVICE_ID = (import.meta.env.VITE_EMAILJS_SERVICE_ID as string | undefined) ?? '';
-const EMAILJS_TEMPLATE_ID = (import.meta.env.VITE_EMAILJS_TEMPLATE_ID as string | undefined) ?? '';
-const EMAILJS_PUBLIC_KEY = (import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string | undefined) ?? '';
 
 function toAuthUser(u: RegisteredUser): AuthUser {
   return { id: u.id, name: u.name, avatar: u.avatar, position: u.position, email: u.email };
-}
-
-async function sendApprovalEmail(user: RegisteredUser): Promise<void> {
-  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) return;
-
-  const base = `${APP_URL}${BASE_PATH}approve`;
-  const approveUrl = `${base}?uid=${user.id}&token=${user.approvalToken}&action=approve`;
-  const rejectUrl = `${base}?uid=${user.id}&token=${user.approvalToken}&action=reject`;
-
-  await emailjsSend(
-    EMAILJS_SERVICE_ID,
-    EMAILJS_TEMPLATE_ID,
-    {
-      to_email: ADMIN_EMAIL,
-      user_name: user.name,
-      user_email: user.email,
-      user_position: user.position,
-      approve_url: approveUrl,
-      reject_url: rejectUrl,
-    },
-    EMAILJS_PUBLIC_KEY
-  );
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────

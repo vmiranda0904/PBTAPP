@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader, AlertTriangle } from 'lucide-react';
 import { updateUserStatus, getUserById } from '../lib/userService';
+import { sendStatusNotificationEmail } from '../lib/emailService';
 
 type PageState = 'loading' | 'confirm' | 'success' | 'error';
 
@@ -58,6 +59,15 @@ export default function ApproveUser() {
     setSubmitting(true);
     const result = await updateUserStatus(uid, token, isApprove ? 'approved' : 'rejected');
     if (result.success) {
+      try {
+        await sendStatusNotificationEmail(
+          data.userName,
+          data.userEmail,
+          isApprove ? 'approved' : 'rejected',
+        );
+      } catch {
+        // Email notification is best-effort; proceed regardless
+      }
       setData(prev => ({ ...prev, state: 'success' }));
     } else {
       setData(prev => ({ ...prev, state: 'error', errorMsg: 'Failed to update the account status. Please try again.' }));
