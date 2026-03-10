@@ -82,10 +82,14 @@ export default function Sidebar() {
             Download App
           </button>
         ) : (
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-500 cursor-default select-none">
+          <a
+            href="https://github.com/vmiranda0904/PBTAPP/archive/refs/heads/main.zip"
+            download
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
             <Download size={18} />
             <span>Download App</span>
-          </div>
+          </a>
         )}
       </div>
 
