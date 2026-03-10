@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, UserPlus, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { useInstallPrompt } from '../hooks/useInstallPrompt';
+import { LogIn, UserPlus, Eye, EyeOff, CheckCircle, Download, X } from 'lucide-react';
 
 const POSITIONS = [
   'Outside Hitter',
@@ -14,7 +15,10 @@ const POSITIONS = [
 
 export default function Login() {
   const { login, register } = useAuth();
+  const { canInstall, isInstalled, triggerInstall } = useInstallPrompt();
   const [tab, setTab] = useState<'signin' | 'register'>('signin');
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [showAndroidGuide, setShowAndroidGuide] = useState(false);
 
   // Sign-in state
   const [email, setEmail] = useState('');
@@ -342,6 +346,95 @@ export default function Login() {
         <p className="text-center text-slate-600 text-xs mt-4">
           PBT Sports Team Management · Compatible with iOS &amp; Android
         </p>
+
+        {/* ── Install buttons ── */}
+        {!isInstalled ? (
+          <div className="mt-5 space-y-2">
+            {/* Android / Chrome */}
+            {canInstall ? (
+              <button
+                onClick={triggerInstall}
+                className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-green-500/50 transition-colors text-sm text-slate-200"
+              >
+                {/* Android robot icon */}
+                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-green-400 flex-shrink-0" aria-hidden="true">
+                  <path d="M17.523 15.341A5 5 0 0 0 17 13H7a5 5 0 0 0-.523 2.341L5 17h14l-1.477-1.659zM12 2a1 1 0 0 1 1 1v.17A7.002 7.002 0 0 1 19 10H5a7.002 7.002 0 0 1 6-6.83V3a1 1 0 0 1 1-1zM8.5 7a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1zm7 0a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1zM6 18a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1H6v1zM2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H3a1 1 0 0 1-1-1zm19 0a1 1 0 0 1-1-1 1 1 0 0 1 0 2h-1a1 1 0 0 1 0-2h1z"/>
+                </svg>
+                <span>Install on Android</span>
+                <Download size={14} className="text-slate-400 ml-auto" />
+              </button>
+            ) : (
+              <button
+                onClick={() => { setShowAndroidGuide(v => !v); setShowIOSGuide(false); }}
+                className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-green-500/50 transition-colors text-sm text-slate-200"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-green-400 flex-shrink-0" aria-hidden="true">
+                  <path d="M17.523 15.341A5 5 0 0 0 17 13H7a5 5 0 0 0-.523 2.341L5 17h14l-1.477-1.659zM12 2a1 1 0 0 1 1 1v.17A7.002 7.002 0 0 1 19 10H5a7.002 7.002 0 0 1 6-6.83V3a1 1 0 0 1 1-1zM8.5 7a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1zm7 0a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1zM6 18a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1H6v1zM2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H3a1 1 0 0 1-1-1zm19 0a1 1 0 0 1-1-1 1 1 0 0 1 0 2h-1a1 1 0 0 1 0-2h1z"/>
+                </svg>
+                <span>Install on Android</span>
+                <Download size={14} className="text-slate-400 ml-auto" />
+              </button>
+            )}
+
+            {showAndroidGuide && (
+              <div className="bg-slate-800 border border-slate-600 rounded-xl p-4 text-sm text-slate-300 space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-white font-semibold text-xs uppercase tracking-wide">Android install steps</p>
+                  <button onClick={() => setShowAndroidGuide(false)} className="text-slate-500 hover:text-white"><X size={14} /></button>
+                </div>
+                {[
+                  'Open this page in Chrome on your Android device.',
+                  'Tap the ⋮ menu in the top-right corner.',
+                  'Tap "Add to Home screen" or "Install app".',
+                  'Tap "Install" to confirm.',
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                    <span className="text-xs leading-relaxed">{step}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* iOS / Safari */}
+            <button
+              onClick={() => { setShowIOSGuide(v => !v); setShowAndroidGuide(false); }}
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500/50 transition-colors text-sm text-slate-200"
+            >
+              {/* Apple logo icon */}
+              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-slate-200 flex-shrink-0" aria-hidden="true">
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.56-1.32 3.1-2.54 3.99zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+              </svg>
+              <span>Install on iPhone / iPad</span>
+              <Download size={14} className="text-slate-400 ml-auto" />
+            </button>
+
+            {showIOSGuide && (
+              <div className="bg-slate-800 border border-slate-600 rounded-xl p-4 text-sm text-slate-300 space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-white font-semibold text-xs uppercase tracking-wide">iOS install steps</p>
+                  <button onClick={() => setShowIOSGuide(false)} className="text-slate-500 hover:text-white"><X size={14} /></button>
+                </div>
+                {[
+                  'Open this page in Safari on your iPhone or iPad.',
+                  'Tap the Share button (box with an arrow) at the bottom of the screen.',
+                  'Scroll down and tap "Add to Home Screen".',
+                  'Tap "Add" in the top-right corner.',
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                    <span className="text-xs leading-relaxed">{step}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-5 flex items-center justify-center gap-2 text-green-400 text-sm">
+            <CheckCircle size={16} />
+            App is installed
+          </div>
+        )}
       </div>
     </div>
   );

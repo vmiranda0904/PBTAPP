@@ -31,7 +31,7 @@ const COLLECTION = 'registrations';
 
 export async function hashPassword(
   password: string,
-  salt: Uint8Array
+  salt: Uint8Array<ArrayBuffer>
 ): Promise<string> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -51,8 +51,8 @@ export async function hashPassword(
     .join('');
 }
 
-export function generateSalt(): Uint8Array {
-  const salt = new Uint8Array(16);
+export function generateSalt(): Uint8Array<ArrayBuffer> {
+  const salt = new Uint8Array(new ArrayBuffer(16));
   crypto.getRandomValues(salt);
   return salt;
 }
@@ -61,8 +61,8 @@ export function saltToHex(salt: Uint8Array): string {
   return Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-export function hexToSalt(hex: string): Uint8Array {
-  const arr = new Uint8Array(hex.length / 2);
+export function hexToSalt(hex: string): Uint8Array<ArrayBuffer> {
+  const arr = new Uint8Array(new ArrayBuffer(hex.length / 2));
   for (let i = 0; i < arr.length; i++) {
     arr[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
