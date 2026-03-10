@@ -8,8 +8,11 @@ import {
   CalendarDays,
   Star,
   Trophy,
+  Download,
+  CheckCircle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useInstallPrompt } from '../hooks/useInstallPrompt';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -25,6 +28,7 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const { players, currentUserId } = useApp();
   const me = players.find(p => p.id === currentUserId);
+  const { canInstall, isInstalled, triggerInstall } = useInstallPrompt();
 
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-700 flex flex-col min-h-screen">
@@ -61,6 +65,29 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Install App */}
+      <div className="px-3 pb-3">
+        {isInstalled ? (
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-green-400 cursor-default select-none">
+            <CheckCircle size={18} />
+            App Installed
+          </div>
+        ) : canInstall ? (
+          <button
+            onClick={triggerInstall}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            <Download size={18} />
+            Download App
+          </button>
+        ) : (
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-500 cursor-default select-none">
+            <Download size={18} />
+            <span>Download App</span>
+          </div>
+        )}
+      </div>
 
       {/* Current User */}
       {me && (
