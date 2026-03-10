@@ -10,8 +10,10 @@ import {
   Trophy,
   Download,
   CheckCircle,
+  LogOut,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 
 const NAV_ITEMS = [
@@ -27,6 +29,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const { players, currentUserId } = useApp();
+  const { logout } = useAuth();
   const me = players.find(p => p.id === currentUserId);
   const { canInstall, isInstalled, triggerInstall } = useInstallPrompt();
 
@@ -100,10 +103,17 @@ export default function Sidebar() {
             <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
               {me.avatar}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-white text-sm font-medium truncate">{me.name}</p>
               <p className="text-slate-400 text-xs">{me.position}</p>
             </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       )}
