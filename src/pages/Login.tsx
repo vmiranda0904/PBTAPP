@@ -37,6 +37,7 @@ export default function Login() {
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
+  const [regAutoApproved, setRegAutoApproved] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,12 +77,13 @@ export default function Login() {
     if (!result.success) {
       setRegError(result.message);
     } else {
-      if (!result.emailSent) {
+      if (!result.autoApproved && !result.emailSent) {
         setRegError(
           'Your account was submitted, but the admin notification email could not be sent. ' +
           'Please contact the administrator directly.'
         );
       }
+      setRegAutoApproved(result.autoApproved ?? false);
       setRegSuccess(true);
     }
     setRegLoading(false);
@@ -206,16 +208,19 @@ export default function Login() {
                 {regSuccess ? (
                   <div className="text-center py-6 space-y-4">
                     <CheckCircle size={48} className="text-green-400 mx-auto" />
-                    <h3 className="text-white text-lg font-semibold">Request Submitted!</h3>
+                    <h3 className="text-white text-lg font-semibold">
+                      {regAutoApproved ? 'Admin Account Created!' : 'Request Submitted!'}
+                    </h3>
                     <p className="text-slate-400 text-sm leading-relaxed">
-                      Your account request has been sent for approval. You will be able to sign in once
-                      the administrator approves your request.
+                      {regAutoApproved
+                        ? 'Your admin account is ready. You can sign in immediately using your email and password.'
+                        : 'Your account request has been sent for approval. You will be able to sign in once the administrator approves your request.'}
                     </p>
                     <button
-                      onClick={() => { setTab('signin'); setRegSuccess(false); }}
+                      onClick={() => { setTab('signin'); setRegSuccess(false); setRegAutoApproved(false); }}
                       className="text-blue-400 hover:text-blue-300 text-sm font-medium"
                     >
-                      Back to Sign In
+                      {regAutoApproved ? 'Sign In Now' : 'Back to Sign In'}
                     </button>
                   </div>
                 ) : (

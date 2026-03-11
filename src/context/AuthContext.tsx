@@ -22,7 +22,7 @@ export type LoginResult =
   | { success: false; message: string };
 
 export type RegisterResult =
-  | { success: true; emailSent: boolean }
+  | { success: true; emailSent: boolean; autoApproved: boolean }
   | { success: false; message: string };
 
 interface AuthContextType {
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    return { success: true, emailSent };
+    return { success: true, emailSent, autoApproved: newUser.status === 'approved' };
   };
 
   const logout = () => {

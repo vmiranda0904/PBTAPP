@@ -101,3 +101,35 @@ The app sends two types of emails:
 
 Once all secrets are added, push to `main` (or re-run the **Deploy to GitHub Pages** workflow) to deploy with email notifications active.
 
+---
+
+## 🔐 Admin Setup & Login
+
+The app has a single designated admin account, identified by the `VITE_ADMIN_EMAIL` GitHub Secret.
+
+### First-time setup
+
+1. Make sure `VITE_ADMIN_EMAIL` is set to **your email address** in the GitHub Secrets (see Configuration section above).
+2. Deploy the app (push to `main`).
+3. Open the app and go to the **Create Account** tab on the sign-in page.
+4. Register using **the same email address** you set as `VITE_ADMIN_EMAIL`.
+5. Because the email matches, your account is **automatically approved** — no approval step required.
+6. You will see an **"Admin Account Created!"** confirmation. Click **Sign In Now**.
+7. Sign in with your admin email and password.
+
+### Accessing the Admin Panel
+
+Once signed in as admin, a **🛡 Admin** link appears in the sidebar. Click it to open the Admin Panel where you can:
+
+- Approve or reject pending user registrations
+- Add, edit, and remove players
+- Manage player stats, points, and events
+
+### Important notes
+
+- Only **one** admin account exists at a time, determined solely by the `VITE_ADMIN_EMAIL` value.
+- If you change `VITE_ADMIN_EMAIL` and redeploy, the **old** account loses admin access and the **new** email gains it (provided that new email has a registered account).
+- Admin accounts bypass the approval workflow — they are active immediately upon registration.
+
+---
+
