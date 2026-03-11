@@ -126,33 +126,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isAdmin]);
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
-    const dbUser = await getUserByEmail(email);
+    try {
+      const dbUser = await getUserByEmail(email.trim());
 
-    if (!dbUser) {
-      return { success: false, message: 'No account found with that email address.' };
+      if (!dbUser) {
+        return { success: false, message: 'No account found with that email address.' };
+      }
+
+      const passwordOk = await verifyPassword(password, dbUser.passwordHash, dbUser.passwordSalt);
+      if (!passwordOk) {
+        return { success: false, message: 'Invalid email or password. Please try again.' };
+      }
+
+      if (dbUser.status === 'pending') {
+        return {
+          success: false,
+          message: 'Your account is pending approval. You will be notified once approved.',
+        };
+      }
+
+      if (dbUser.status === 'rejected') {
+        return {
+          success: false,
+          message: 'Your account request was not approved. Please contact the administrator.',
+        };
+      }
+
+      setUser(toAuthUser(dbUser));
+      return { success: true };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, message: 'Unable to sign in. Please check your connection and try again.' };
     }
-
-    const passwordOk = await verifyPassword(password, dbUser.passwordHash, dbUser.passwordSalt);
-    if (!passwordOk) {
-      return { success: false, message: 'Invalid email or password. Please try again.' };
-    }
-
-    if (dbUser.status === 'pending') {
-      return {
-        success: false,
-        message: 'Your account is pending approval. You will be notified once approved.',
-      };
-    }
-
-    if (dbUser.status === 'rejected') {
-      return {
-        success: false,
-        message: 'Your account request was not approved. Please contact the administrator.',
-      };
-    }
-
-    setUser(toAuthUser(dbUser));
-    return { success: true };
   };
 
   const register = async (fields: {
@@ -163,62 +168,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     teamCode?: string;
     teamName?: string;
   }): Promise<RegisterResult> => {
-    const existing = await getUserByEmail(fields.email);
-    if (existing) {
-      return { success: false, message: 'An account with that email already exists.' };
-    }
-
-    let teamId: string;
-    let isTeamCreator = false;
-    let teamAdminEmail: string | undefined;
-    let returnedTeamCode: string | undefined;
-
-    if (fields.teamCode) {
-      // ── Join existing team ──────────────────────────────────────────────────
-      const team = await getTeamByCode(fields.teamCode);
-      if (!team) {
-        return { success: false, message: 'No team found with that code. Please check and try again.' };
+    try {
+      const existing = await getUserByEmail(fields.email);
+      if (existing) {
+        return { success: false, message: 'An account with that email already exists.' };
       }
-      teamId = team.id;
-      teamAdminEmail = team.adminEmail;
-    } else {
-      // ── Create new team ─────────────────────────────────────────────────────
-      const name = fields.teamName?.trim();
-      if (!name) {
-        return { success: false, message: 'Please enter a team name to create a new team.' };
+
+      let teamId: string;
+      let isTeamCreator = false;
+      let teamAdminEmail: string | undefined;
+      let returnedTeamCode: string | undefined;
+
+      if (fields.teamCode) {
+        // ── Join existing team ──────────────────────────────────────────────────
+        const team = await getTeamByCode(fields.teamCode);
+        if (!team) {
+          return { success: false, message: 'No team found with that code. Please check and try again.' };
+        }
+        teamId = team.id;
+        teamAdminEmail = team.adminEmail;
+      } else {
+        // ── Create new team ─────────────────────────────────────────────────────
+        const name = fields.teamName?.trim();
+        if (!name) {
+          return { success: false, message: 'Please enter a team name to create a new team.' };
+        }
+        const team = await createTeam(name, fields.email);
+        teamId = team.id;
+        isTeamCreator = true;
+        returnedTeamCode = team.teamCode;
       }
-      const team = await createTeam(name, fields.email);
-      teamId = team.id;
-      isTeamCreator = true;
-      returnedTeamCode = team.teamCode;
-    }
 
-    // Check app-wide approval setting before creating the registration
-    const settings = await getAppSettings();
-    const newUser = await createRegistration(
-      { ...fields, teamId, role: isTeamCreator ? 'Admin' : fields.role },
-      isTeamCreator,
-      settings.requireApproval,
-    );
+      // Check app-wide approval setting before creating the registration
+      const settings = await getAppSettings();
+      const newUser = await createRegistration(
+        { ...fields, teamId, role: isTeamCreator ? 'Admin' : fields.role },
+        isTeamCreator,
+        settings.requireApproval,
+      );
 
-    let emailSent = true;
-    if (newUser.status === 'pending') {
-      // Send approval email to the team admin
-      try {
-        await sendApprovalEmail(newUser, teamAdminEmail);
-      } catch {
-        emailSent = false;
+      let emailSent = true;
+      if (newUser.status === 'pending') {
+        // Send approval email to the team admin
+        try {
+          await sendApprovalEmail(newUser, teamAdminEmail);
+        } catch {
+          emailSent = false;
+        }
+        // Push notification to the admin is handled by the Firestore real-time
+        // listener set up in the admin's browser session.
       }
-      // Push notification to the admin is handled by the Firestore real-time
-      // listener set up in the admin's browser session.
-    }
 
-    return {
-      success: true,
-      emailSent,
-      autoApproved: newUser.status === 'approved',
-      teamCode: returnedTeamCode,
-    };
+      return {
+        success: true,
+        emailSent,
+        autoApproved: newUser.status === 'approved',
+        teamCode: returnedTeamCode,
+      };
+    } catch (err) {
+      console.error('Registration error:', err);
+      return { success: false, message: 'Unable to create account. Please check your connection and try again.' };
+    }
   };
 
   const approveUser = async (uid: string, status: 'approved' | 'rejected'): Promise<boolean> => {
