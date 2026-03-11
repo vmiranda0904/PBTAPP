@@ -95,7 +95,7 @@ export default function Points() {
                   </div>
                   <div>
                     <p className="text-white font-medium">{player.name}</p>
-                    <p className="text-slate-400 text-xs">{player.position}</p>
+                    <p className="text-slate-400 text-xs">{player.role}</p>
                   </div>
                 </div>
                 <span className="text-slate-500 text-sm font-medium">#{rank + 1}</span>

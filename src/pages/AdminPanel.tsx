@@ -21,14 +21,11 @@ import {
 
 type Tab = 'players' | 'stats' | 'points' | 'events';
 
-const POSITIONS = [
-  'Outside Hitter',
-  'Setter',
-  'Libero',
-  'Middle Blocker',
-  'Opposite Hitter',
-  'Defensive Specialist',
-  'Other',
+const ROLES = [
+  'Parent',
+  'Player',
+  'Coach',
+  'Admin',
 ];
 
 const PLACEMENTS: Placement[] = ['1st', '2nd', '3rd', '4th', 'participant'];
@@ -36,7 +33,7 @@ const PLACEMENTS: Placement[] = ['1st', '2nd', '3rd', '4th', 'participant'];
 const emptyPlayerForm = (): Omit<Player, 'id'> => ({
   name: '',
   avatar: '',
-  position: 'Outside Hitter',
+  role: 'Player',
   totalPoints: 0,
   practiceAttendance: 0,
   tournamentsPlayed: 0,
@@ -182,15 +179,15 @@ function PlayersTab() {
               />
             </div>
             <div>
-              <label className="text-slate-400 text-xs block mb-1">Position</label>
+              <label className="text-slate-400 text-xs block mb-1">Role</label>
               <div className="relative">
                 <select
-                  value={form.position}
-                  onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
+                  value={form.role}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
                 >
-                  {POSITIONS.map(pos => (
-                    <option key={pos} value={pos}>{pos}</option>
+                  {ROLES.map(r => (
+                    <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -253,7 +250,7 @@ function PlayersTab() {
               <div className="min-w-0">
                 <p className="text-white text-sm font-medium truncate">{player.name}</p>
                 <p className="text-slate-400 text-xs truncate">
-                  {player.position} · {player.totalPoints} pts · {player.wins}W {player.losses}L
+                  {player.role} · {player.totalPoints} pts · {player.wins}W {player.losses}L
                 </p>
               </div>
             </div>
@@ -344,7 +341,7 @@ function StatsTab() {
               </div>
               <div className="text-left">
                 <p className="text-white text-sm font-medium">{player.name}</p>
-                <p className="text-slate-400 text-xs">{player.position}</p>
+                <p className="text-slate-400 text-xs">{player.role}</p>
               </div>
             </div>
             <Pencil size={15} className={`flex-shrink-0 ${editingId === player.id ? 'text-blue-400' : 'text-slate-500'}`} />

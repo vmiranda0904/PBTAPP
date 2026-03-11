@@ -125,7 +125,7 @@ export default function Sidebar() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-white text-sm font-medium truncate">{me.name}</p>
-              <p className="text-slate-400 text-xs">{me.position}</p>
+              <p className="text-slate-400 text-xs">{me.role}</p>
             </div>
             <button
               onClick={logout}

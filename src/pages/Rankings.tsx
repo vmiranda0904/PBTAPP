@@ -107,7 +107,7 @@ export default function Rankings() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium">{player.name}</p>
-                  <p className="text-slate-400 text-xs">{player.position}</p>
+                  <p className="text-slate-400 text-xs">{player.role}</p>
                 </div>
                 <div className="flex items-center gap-6 text-right">
                   <div>
