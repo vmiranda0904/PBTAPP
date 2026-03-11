@@ -230,12 +230,19 @@ interface AppContextType {
 
   sendMessage: (content: string, channel: string) => void;
   addEvent: (event: Omit<CalendarEvent, 'id'>) => void;
+  removeEvent: (eventId: string) => void;
   recordPracticeAttendance: (playerId: string, eventId: string) => void;
   recordTournamentResult: (playerId: string, tournamentName: string, placement: Placement, date: string) => void;
+  removeTournamentResult: (resultId: string) => void;
   addHeatMapPoint: (point: Omit<HeatMapPoint, 'value'> & { value?: number }) => void;
   updatePlayerStats: (playerId: string, stats: Partial<Player['stats']>) => void;
   saveClip: (streamId: string, streamTitle: string, duration: ClipDuration) => void;
   deleteClip: (clipId: string) => void;
+  // Admin CRUD
+  addPlayer: (player: Omit<Player, 'id'>) => void;
+  updatePlayer: (playerId: string, updates: Partial<Omit<Player, 'id'>>) => void;
+  removePlayer: (playerId: string) => void;
+  awardPoints: (playerId: string, points: number, reason: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -360,12 +367,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setClips(prev => prev.filter(c => c.id !== clipId));
   }, []);
 
+  const removeEvent = useCallback((eventId: string) => {
+    setEvents(prev => prev.filter(e => e.id !== eventId));
+  }, []);
+
+  const removeTournamentResult = useCallback((resultId: string) => {
+    const result = tournamentResults.find(r => r.id === resultId);
+    if (!result) return;
+    setTournamentResults(prev => prev.filter(r => r.id !== resultId));
+    if (result.pointsAwarded) {
+      setPlayers(prev => prev.map(p =>
+        p.id === result.playerId
+          ? { ...p, totalPoints: Math.max(0, p.totalPoints - result.pointsAwarded) }
+          : p
+      ));
+    }
+  }, [tournamentResults]);
+
+  const addPlayer = useCallback((player: Omit<Player, 'id'>) => {
+    const newPlayer: Player = { ...player, id: `p${Date.now()}` };
+    setPlayers(prev => [...prev, newPlayer]);
+  }, []);
+
+  const updatePlayer = useCallback((playerId: string, updates: Partial<Omit<Player, 'id'>>) => {
+    setPlayers(prev => prev.map(p =>
+      p.id === playerId ? { ...p, ...updates } : p
+    ));
+  }, []);
+
+  const removePlayer = useCallback((playerId: string) => {
+    setPlayers(prev => prev.filter(p => p.id !== playerId));
+    setTournamentResults(prev => prev.filter(r => r.playerId !== playerId));
+  }, []);
+
+  const awardPoints = useCallback((playerId: string, points: number, reason: string) => {
+    const newResult: TournamentResult = {
+      id: `r${Date.now()}`,
+      tournamentId: `manual_${Date.now()}`,
+      tournamentName: reason,
+      playerId,
+      placement: null,
+      date: new Date().toISOString().split('T')[0],
+      pointsAwarded: points,
+    };
+    setTournamentResults(prev => [...prev, newResult]);
+    setPlayers(prev => prev.map(p =>
+      p.id === playerId
+        ? { ...p, totalPoints: Math.max(0, p.totalPoints + points) }
+        : p
+    ));
+  }, []);
+
   return (
     <AppContext.Provider value={{
       players, messages, events, heatMapPoints, tournamentResults, clips,
       currentUserId, sportType, setSportType,
-      sendMessage, addEvent, recordPracticeAttendance, recordTournamentResult,
-      addHeatMapPoint, updatePlayerStats, saveClip, deleteClip,
+      sendMessage, addEvent, removeEvent, recordPracticeAttendance, recordTournamentResult,
+      removeTournamentResult, addHeatMapPoint, updatePlayerStats, saveClip, deleteClip,
+      addPlayer, updatePlayer, removePlayer, awardPoints,
     }}>
       {children}
     </AppContext.Provider>

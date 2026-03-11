@@ -12,6 +12,7 @@ import Points from './pages/Points';
 import Rankings from './pages/Rankings';
 import Login from './pages/Login';
 import ApproveUser from './pages/ApproveUser';
+import AdminPanel from './pages/AdminPanel';
 
 function AuthRedirect() {
   const { isAuthenticated } = useAuth();
@@ -35,6 +36,7 @@ function ProtectedApp() {
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/points" element={<Points />} />
             <Route path="/rankings" element={<Rankings />} />
+            <Route path="/admin" element={<AdminPanel />} />
           </Routes>
         </main>
       </div>
