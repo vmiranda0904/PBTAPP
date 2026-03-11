@@ -28,7 +28,7 @@ export type LoginResult =
   | { success: false; message: string };
 
 export type RegisterResult =
-  | { success: true; emailSent: boolean; autoApproved: boolean; teamCode?: string }
+  | { success: true; emailSent: boolean; autoApproved: boolean; teamCode?: string; isAdminRegistration: boolean }
   | { success: false; message: string };
 
 interface AuthContextType {
@@ -53,6 +53,7 @@ interface AuthContextType {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'pbt_auth_user';
+const ADMIN_EMAIL_ENV = ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '').toLowerCase().trim();
 
 function toAuthUser(u: RegisteredUser): AuthUser {
   return { id: u.id, name: u.name, avatar: u.avatar, role: u.role, email: u.email, teamId: u.teamId };
@@ -179,6 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let teamAdminEmail: string | undefined;
       let returnedTeamCode: string | undefined;
 
+      const emailNorm = fields.email.toLowerCase().trim();
+      const isAdminEmail = !!ADMIN_EMAIL_ENV && emailNorm === ADMIN_EMAIL_ENV;
+
       if (fields.teamCode) {
         // ── Join existing team ──────────────────────────────────────────────────
         const team = await getTeamByCode(fields.teamCode);
@@ -199,11 +203,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         returnedTeamCode = team.teamCode;
       }
 
+      // The designated admin email is always auto-approved (bypasses the approval queue)
+      const shouldAutoApprove = isTeamCreator || isAdminEmail;
+
       // Check app-wide approval setting before creating the registration
       const settings = await getAppSettings();
       const newUser = await createRegistration(
-        { ...fields, teamId, role: isTeamCreator ? 'Admin' : fields.role },
-        isTeamCreator,
+        { ...fields, teamId, role: shouldAutoApprove ? 'Admin' : fields.role },
+        shouldAutoApprove,
         settings.requireApproval,
       );
 
@@ -224,6 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailSent,
         autoApproved: newUser.status === 'approved',
         teamCode: returnedTeamCode,
+        isAdminRegistration: newUser.role === 'Admin',
       };
     } catch (err) {
       console.error('Registration error:', err);
