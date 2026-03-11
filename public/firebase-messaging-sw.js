@@ -2,11 +2,11 @@
 // Firebase Cloud Messaging service worker for background push notifications.
 // This file must be served from the root of the app's scope.
 //
-// NOTE: The Firebase compat SDK version below (11.0.0) must be kept in sync
+// NOTE: The Firebase compat SDK version below (12.0.0) must be kept in sync
 // with the major version used in package.json (firebase ^12.x) — update this
 // URL whenever you upgrade the firebase npm package.
-importScripts('https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/11.0.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging-compat.js');
 
 // Initialize Firebase with the same config used in the app.
 // These values are populated at build time through environment variable

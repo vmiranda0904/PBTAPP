@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Registrations ──────────────────────────────────────────────────────────
+    // Anyone can look up a registration by ID (needed for the approve/reject
+    // link flow) or query by email/status (needed for login and pending-user
+    // lists).  Writes are open so the client-side custom-auth flow can create
+    // and update records.  Password data is hashed (PBKDF2) before storage.
+    match /registrations/{userId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll([
+        'id', 'name', 'email', 'passwordHash', 'passwordSalt',
+        'avatar', 'role', 'status', 'approvalToken', 'createdAt', 'teamId'
+      ]);
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status']);
+    }
+
+    // ── Teams ──────────────────────────────────────────────────────────────────
+    // Readable by anyone (needed to validate team codes during registration).
+    // Anyone can create a new team; existing teams cannot be overwritten.
+    match /teams/{teamId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll([
+        'id', 'teamCode', 'teamName', 'adminEmail', 'createdAt'
+      ]);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── App settings ──────────────────────────────────────────────────────────
+    // Readable by all clients so the registration flow can check the
+    // requireApproval flag without authentication.  Writes are limited to the
+    // known fields used by the app.  Note: this app uses a custom (non-Firebase
+    // Auth) authentication system, so writes cannot be restricted to a specific
+    // authenticated user here.  Protect this data by keeping Firebase project
+    // credentials private and restricting Firebase project access.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly([
+        'requireApproval', 'pushNotificationsEnabled', 'adminFcmToken'
+      ]);
+    }
+  }
+}
