@@ -7,6 +7,7 @@ import {
   subscribeToPendingUsers,
   type RegisteredUser,
 } from '../lib/userService';
+import { createTeam, getTeamByCode } from '../lib/teamService';
 import { sendApprovalEmail } from '../lib/emailService';
 import { getAppSettings } from '../lib/settingsService';
 import { showBrowserNotification } from '../lib/pushNotificationService';
@@ -19,6 +20,7 @@ export interface AuthUser {
   avatar: string;
   role: string;
   email: string;
+  teamId: string;
 }
 
 export type LoginResult =
@@ -26,7 +28,7 @@ export type LoginResult =
   | { success: false; message: string };
 
 export type RegisterResult =
-  | { success: true; emailSent: boolean; autoApproved: boolean }
+  | { success: true; emailSent: boolean; autoApproved: boolean; teamCode?: string }
   | { success: false; message: string };
 
 interface AuthContextType {
@@ -37,6 +39,10 @@ interface AuthContextType {
     email: string;
     password: string;
     role: string;
+    /** Provide to join an existing team; omit to create a new team. */
+    teamCode?: string;
+    /** Required when creating a new team (teamCode is absent). */
+    teamName?: string;
   }) => Promise<RegisterResult>;
   logout: () => void;
   approveUser: (uid: string, status: 'approved' | 'rejected') => Promise<boolean>;
@@ -47,10 +53,9 @@ interface AuthContextType {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'pbt_auth_user';
-const ADMIN_EMAIL = ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '').toLowerCase().trim();
 
 function toAuthUser(u: RegisteredUser): AuthUser {
-  return { id: u.id, name: u.name, avatar: u.avatar, role: u.role, email: u.email };
+  return { id: u.id, name: u.name, avatar: u.avatar, role: u.role, email: u.email, teamId: u.teamId };
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -71,7 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const isAdmin = !!user && !!ADMIN_EMAIL && user.email.toLowerCase() === ADMIN_EMAIL;
+  // A user is an admin when their role is 'Admin'.
+  const isAdmin = !!user && user.role === 'Admin';
 
   // ── Admin-side pending-user watcher ─────────────────────────────────────────
   // When the admin is logged in and push notifications are enabled, subscribe to
@@ -80,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const seenPendingIds = useRef<Set<string>>(new Set());
   const isFirstSnapshot = useRef(true);
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || !user) return;
 
     seenPendingIds.current = new Set();
     isFirstSnapshot.current = true;
@@ -104,12 +110,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             seenPendingIds.current.add(u.id);
             showBrowserNotification(
               'New Sign-Up Request',
-              `${u.name} (${u.role}) wants to join PBT Sports.`,
+              `${u.name} (${u.role}) wants to join your team.`,
               `signup-${u.id}`,
             );
           }
         }
-      });
+      }, user.teamId);
     });
 
     return () => {
@@ -154,30 +160,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string;
     password: string;
     role: string;
+    teamCode?: string;
+    teamName?: string;
   }): Promise<RegisterResult> => {
     const existing = await getUserByEmail(fields.email);
     if (existing) {
       return { success: false, message: 'An account with that email already exists.' };
     }
 
+    let teamId: string;
+    let isTeamCreator = false;
+    let teamAdminEmail: string | undefined;
+    let returnedTeamCode: string | undefined;
+
+    if (fields.teamCode) {
+      // ── Join existing team ──────────────────────────────────────────────────
+      const team = await getTeamByCode(fields.teamCode);
+      if (!team) {
+        return { success: false, message: 'No team found with that code. Please check and try again.' };
+      }
+      teamId = team.id;
+      teamAdminEmail = team.adminEmail;
+    } else {
+      // ── Create new team ─────────────────────────────────────────────────────
+      const name = fields.teamName?.trim();
+      if (!name) {
+        return { success: false, message: 'Please enter a team name to create a new team.' };
+      }
+      const team = await createTeam(name, fields.email);
+      teamId = team.id;
+      isTeamCreator = true;
+      returnedTeamCode = team.teamCode;
+    }
+
     // Check app-wide approval setting before creating the registration
     const settings = await getAppSettings();
-    const newUser = await createRegistration(fields, settings.requireApproval);
+    const newUser = await createRegistration(
+      { ...fields, teamId, role: isTeamCreator ? 'Admin' : fields.role },
+      isTeamCreator,
+      settings.requireApproval,
+    );
 
     let emailSent = true;
     if (newUser.status === 'pending') {
-      // Send approval email to admin
+      // Send approval email to the team admin
       try {
-        await sendApprovalEmail(newUser);
+        await sendApprovalEmail(newUser, teamAdminEmail);
       } catch {
         emailSent = false;
       }
       // Push notification to the admin is handled by the Firestore real-time
-      // listener set up in the admin's browser session (see useEffect at line 82
-      // in AuthContext.tsx).
+      // listener set up in the admin's browser session.
     }
 
-    return { success: true, emailSent, autoApproved: newUser.status === 'approved' };
+    return {
+      success: true,
+      emailSent,
+      autoApproved: newUser.status === 'approved',
+      teamCode: returnedTeamCode,
+    };
   };
 
   const approveUser = async (uid: string, status: 'approved' | 'rejected'): Promise<boolean> => {
@@ -188,6 +229,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null);
   };
+
+  // Expose getTeamById so components can look up team info by the logged-in user's teamId.
+  // (Not added to context to keep the API minimal; components import it directly.)
 
   return (
     <AuthContext.Provider value={{ user, login, register, logout, approveUser, isAuthenticated: !!user, isAdmin }}>

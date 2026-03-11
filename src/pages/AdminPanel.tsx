@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import type { Player, Placement } from '../context/AppContext';
-import { getPendingUsers, type RegisteredUser } from '../lib/userService';
+import { getPendingUsersByTeam, type RegisteredUser } from '../lib/userService';
 import { getAppSettings, updateAppSettings, type AppSettings } from '../lib/settingsService';
 import {
   enableAdminPushNotifications,
@@ -11,6 +11,7 @@ import {
   getNotificationPermission,
 } from '../lib/pushNotificationService';
 import { sendStatusNotificationEmail } from '../lib/emailService';
+import { getTeamById, type Team } from '../lib/teamService';
 import {
   ShieldCheck,
   Users,
@@ -30,6 +31,7 @@ import {
   Check,
   Ban,
   RefreshCw,
+  Copy,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -832,7 +834,7 @@ function EventsTab() {
 // ─── Approvals Tab ────────────────────────────────────────────────────────────
 
 function ApprovalsTab() {
-  const { approveUser } = useAuth();
+  const { approveUser, user } = useAuth();
   const [pendingUsers, setPendingUsers] = useState<RegisteredUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -841,14 +843,16 @@ function ApprovalsTab() {
   async function load() {
     setLoading(true);
     try {
-      const users = await getPendingUsers();
+      const users = user?.teamId
+        ? await getPendingUsersByTeam(user.teamId)
+        : [];
       setPendingUsers(users);
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []);// eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDecision(uid: string, userName: string, userEmail: string, status: 'approved' | 'rejected') {
     setActionLoading(uid);
@@ -936,20 +940,39 @@ function ApprovalsTab() {
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 function SettingsTab() {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [permissionState, setPermissionState] = useState<NotificationPermission>('default');
   const [statusMsg, setStatusMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     setPermissionState(getNotificationPermission());
-    getAppSettings().then(s => {
+    const teamId = user?.teamId;
+    Promise.all([
+      getAppSettings(),
+      teamId ? getTeamById(teamId) : Promise.resolve(null),
+    ]).then(([s, t]) => {
       setSettings(s);
+      setTeam(t);
       setLoading(false);
     });
-  }, []);
+  }, [user?.teamId]);
+
+  async function handleCopyCode() {
+    if (!team) return;
+    try {
+      await navigator.clipboard.writeText(team.teamCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      // clipboard not available
+    }
+  }
 
   function flash(text: string, ok: boolean) {
     setStatusMsg({ text, ok });
@@ -1025,6 +1048,32 @@ function SettingsTab() {
       {statusMsg && (
         <div className={`rounded-lg px-4 py-2 text-sm ${statusMsg.ok ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
           {statusMsg.text}
+        </div>
+      )}
+
+      {/* Team Code Section */}
+      {team && (
+        <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 space-y-3">
+          <h2 className="text-white font-semibold flex items-center gap-2">
+            <Users size={17} className="text-cyan-400" />
+            Team Code
+          </h2>
+          <p className="text-slate-400 text-xs">
+            Share this code with players, coaches, and parents so they can join your team when they create their account.
+          </p>
+          <div className="flex items-center gap-3 bg-slate-900 rounded-lg px-4 py-3">
+            <span className="flex-1 text-2xl font-bold tracking-widest text-cyan-400 font-mono">{team.teamCode}</span>
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 text-xs"
+              title="Copy team code"
+            >
+              {codeCopied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+              {codeCopied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-slate-500 text-xs">Team: <span className="text-slate-300">{team.teamName}</span></p>
         </div>
       )}
 
