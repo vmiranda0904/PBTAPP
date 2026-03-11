@@ -81,9 +81,9 @@ const PLANS = [
 export default function Membership() {
   function handleUpgrade(planId: string) {
     if (planId === 'pro') {
-      window.location.href = 'mailto:primebeachtraining@gmail.com?subject=PBT%20Sports%20Pro%20Upgrade&body=Hi%2C%20I%27d%20like%20to%20upgrade%20to%20the%20Pro%20plan.';
+      window.location.assign('mailto:primebeachtraining@gmail.com?subject=PBT%20Sports%20Pro%20Upgrade&body=Hi%2C%20I%27d%20like%20to%20upgrade%20to%20the%20Pro%20plan.');
     } else if (planId === 'team') {
-      window.location.href = 'mailto:primebeachtraining@gmail.com?subject=PBT%20Sports%20Team%20Plan&body=Hi%2C%20I%27d%20like%20to%20learn%20more%20about%20the%20Team%20plan.';
+      window.location.assign('mailto:primebeachtraining@gmail.com?subject=PBT%20Sports%20Team%20Plan&body=Hi%2C%20I%27d%20like%20to%20learn%20more%20about%20the%20Team%20plan.');
     }
   }
 

@@ -13,12 +13,12 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { getPendingUsers, adminUpdateUserStatus, type RegisteredUser } from '../lib/userService';
+import { getPendingUsersByTeam, adminUpdateUserStatus, type RegisteredUser } from '../lib/userService';
 import { sendStatusNotificationEmail } from '../lib/emailService';
 
 export default function Dashboard() {
   const { players, events, messages, tournamentResults } = useApp();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   const sorted = [...players].sort((a, b) => b.totalPoints - a.totalPoints);
   const topPlayer = sorted[0];
@@ -59,16 +59,17 @@ export default function Dashboard() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const loadPendingUsers = useCallback(async () => {
+    if (!user?.teamId) return;
     setPendingLoading(true);
     try {
-      const users = await getPendingUsers();
+      const users = await getPendingUsersByTeam(user.teamId);
       setPendingUsers(users);
     } catch {
       setPendingUsers([]);
     } finally {
       setPendingLoading(false);
     }
-  }, []);
+  }, [user?.teamId]);
 
   useEffect(() => {
     if (isAdmin) {

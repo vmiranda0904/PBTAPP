@@ -25,10 +25,11 @@ export interface RegisteredUser {
   status: UserStatus;
   approvalToken: string;
   createdAt: string;
+  /** Firestore ID of the team this user belongs to. */
+  teamId: string;
 }
 
 const COLLECTION = 'registrations';
-const ADMIN_EMAIL = ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '').toLowerCase().trim();
 
 // ─── Password hashing (PBKDF2 via Web Crypto API) ────────────────────────────
 
@@ -115,8 +116,11 @@ export async function createRegistration(
     email: string;
     password: string;
     role: string;
+    teamId: string;
   },
-  requireApproval = true
+  /** When true the new user is marked approved immediately (team creator). */
+  isTeamCreator = false,
+  requireApproval = true,
 ): Promise<RegisteredUser> {
   const id = generateId();
   const approvalToken = generateToken();
@@ -130,7 +134,6 @@ export async function createRegistration(
     .slice(0, 2);
 
   const emailNorm = fields.email.toLowerCase().trim();
-  const isAdminAccount = !!ADMIN_EMAIL && emailNorm === ADMIN_EMAIL;
 
   const user: RegisteredUser = {
     id,
@@ -140,11 +143,10 @@ export async function createRegistration(
     passwordSalt: saltHex,
     avatar: initials,
     role: fields.role,
-    // Admin accounts are always auto-approved; other accounts are auto-approved
-    // only when the requireApproval setting is false.
-    status: isAdminAccount || !requireApproval ? 'approved' : 'pending',
+    status: isTeamCreator || !requireApproval ? 'approved' : 'pending',
     approvalToken,
     createdAt: new Date().toISOString(),
+    teamId: fields.teamId,
   };
 
   await setDoc(doc(db, COLLECTION, id), user);
@@ -191,13 +193,25 @@ export async function adminUpdateUserStatus(
  * Returns an unsubscribe function.
  */
 export function subscribeToPendingUsers(
-  onChange: (users: RegisteredUser[]) => void
+  onChange: (users: RegisteredUser[]) => void,
+  teamId?: string,
 ): Unsubscribe {
-  const q = query(
-    collection(db, COLLECTION),
-    where('status', '==', 'pending')
-  );
+  const constraints = teamId
+    ? [where('status', '==', 'pending'), where('teamId', '==', teamId)]
+    : [where('status', '==', 'pending')];
+  const q = query(collection(db, COLLECTION), ...constraints);
   return onSnapshot(q, snap => {
     onChange(snap.docs.map(d => d.data() as RegisteredUser));
   });
+}
+
+/** Returns pending users scoped to a specific team. */
+export async function getPendingUsersByTeam(teamId: string): Promise<RegisteredUser[]> {
+  const q = query(
+    collection(db, COLLECTION),
+    where('status', '==', 'pending'),
+    where('teamId', '==', teamId),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data() as RegisteredUser);
 }

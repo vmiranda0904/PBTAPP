@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
-import { LogIn, UserPlus, Eye, EyeOff, CheckCircle, Download, X } from 'lucide-react';
+import { LogIn, UserPlus, Eye, EyeOff, CheckCircle, Download, X, Copy, Check } from 'lucide-react';
 
-const ROLES = ['Admin', 'Coach', 'Player', 'Parent'];
+const JOIN_ROLES = ['Coach', 'Player', 'Parent'];
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -20,16 +20,21 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   // Register state
+  const [regMode, setRegMode] = useState<'create' | 'join'>('create');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
   const [regRole, setRegRole] = useState('');
+  const [regTeamName, setRegTeamName] = useState('');
+  const [regTeamCode, setRegTeamCode] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [regAutoApproved, setRegAutoApproved] = useState(false);
+  const [newTeamCode, setNewTeamCode] = useState('');
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +59,7 @@ export default function Login() {
       setRegError('Password must be at least 8 characters.');
       return;
     }
-    if (!regRole) {
+    if (regMode === 'join' && !regRole) {
       setRegError('Please select your role.');
       return;
     }
@@ -64,7 +69,9 @@ export default function Login() {
       name: regName,
       email: regEmail,
       password: regPassword,
-      role: regRole,
+      role: regMode === 'join' ? regRole : 'Admin',
+      teamCode: regMode === 'join' ? regTeamCode : undefined,
+      teamName: regMode === 'create' ? regTeamName : undefined,
     });
     if (!result.success) {
       setRegError(result.message);
@@ -76,9 +83,35 @@ export default function Login() {
         );
       }
       setRegAutoApproved(result.autoApproved ?? false);
+      setNewTeamCode(result.teamCode ?? '');
       setRegSuccess(true);
     }
     setRegLoading(false);
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(newTeamCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      // clipboard not available
+    }
+  };
+
+  const resetRegForm = () => {
+    setRegName('');
+    setRegEmail('');
+    setRegPassword('');
+    setRegConfirm('');
+    setRegRole('');
+    setRegTeamName('');
+    setRegTeamCode('');
+    setRegError('');
+    setRegSuccess(false);
+    setRegAutoApproved(false);
+    setNewTeamCode('');
+    setCodeCopied(false);
   };
 
   return (
@@ -109,7 +142,7 @@ export default function Login() {
               Sign In
             </button>
             <button
-              onClick={() => { setTab('register'); setRegError(''); setRegSuccess(false); }}
+              onClick={() => { setTab('register'); setRegError(''); resetRegForm(); }}
               className={`flex-1 py-3.5 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
                 tab === 'register'
                   ? 'text-white bg-slate-800 border-b-2 border-cyan-500'
@@ -204,15 +237,32 @@ export default function Login() {
                   <div className="text-center py-6 space-y-4">
                     <CheckCircle size={48} className="text-green-400 mx-auto" />
                     <h3 className="text-white text-lg font-semibold">
-                      {regAutoApproved ? 'Admin Account Created!' : 'Request Submitted!'}
+                      {regAutoApproved ? 'Team Created!' : 'Request Submitted!'}
                     </h3>
                     <p className="text-slate-400 text-sm leading-relaxed">
                       {regAutoApproved
                         ? 'Your admin account is ready. You can sign in immediately using your email and password.'
                         : 'Your account request has been sent for approval. You will be able to sign in once the administrator approves your request.'}
                     </p>
+                    {newTeamCode && (
+                      <div className="bg-slate-800 border border-slate-600 rounded-xl p-4 space-y-2">
+                        <p className="text-slate-400 text-xs">Your team code — share this with your members:</p>
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-2xl font-bold tracking-widest text-cyan-400">{newTeamCode}</span>
+                          <button
+                            type="button"
+                            onClick={handleCopyCode}
+                            className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors"
+                            title="Copy team code"
+                          >
+                            {codeCopied ? <Check size={15} className="text-green-400" /> : <Copy size={15} />}
+                          </button>
+                        </div>
+                        <p className="text-slate-500 text-xs">Members use this code when they create their account.</p>
+                      </div>
+                    )}
                     <button
-                      onClick={() => { setTab('signin'); setRegSuccess(false); setRegAutoApproved(false); }}
+                      onClick={() => { setTab('signin'); resetRegForm(); }}
                       className="text-blue-400 hover:text-blue-300 text-sm font-medium"
                     >
                       {regAutoApproved ? 'Sign In Now' : 'Back to Sign In'}
@@ -220,6 +270,69 @@ export default function Login() {
                   </div>
                 ) : (
                   <form onSubmit={handleRegister} className="space-y-4">
+                    {/* ── Create vs Join toggle ── */}
+                    <div className="flex rounded-lg overflow-hidden border border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => { setRegMode('create'); setRegRole(''); setRegTeamCode(''); setRegError(''); }}
+                        className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                          regMode === 'create'
+                            ? 'bg-cyan-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Create New Team
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setRegMode('join'); setRegTeamName(''); setRegError(''); }}
+                        className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                          regMode === 'join'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Join Existing Team
+                      </button>
+                    </div>
+
+                    {/* ── Team name (create mode) ── */}
+                    {regMode === 'create' && (
+                      <div>
+                        <label className="block text-slate-300 text-sm font-medium mb-1.5">
+                          Team Name
+                        </label>
+                        <input
+                          type="text"
+                          value={regTeamName}
+                          onChange={e => setRegTeamName(e.target.value)}
+                          placeholder="e.g. Sunset Volleyball Club"
+                          required
+                          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm"
+                        />
+                        <p className="text-slate-500 text-xs mt-1">You will be the admin of this team.</p>
+                      </div>
+                    )}
+
+                    {/* ── Team code (join mode) ── */}
+                    {regMode === 'join' && (
+                      <div>
+                        <label className="block text-slate-300 text-sm font-medium mb-1.5">
+                          Team Code
+                        </label>
+                        <input
+                          type="text"
+                          value={regTeamCode}
+                          onChange={e => setRegTeamCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. ABC123"
+                          required
+                          maxLength={6}
+                          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-mono tracking-widest uppercase"
+                        />
+                        <p className="text-slate-500 text-xs mt-1">Ask your team admin for the 6-character team code.</p>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-slate-300 text-sm font-medium mb-1.5">
                         Full Name
@@ -248,22 +361,25 @@ export default function Login() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-slate-300 text-sm font-medium mb-1.5">
-                        Role
-                      </label>
-                      <select
-                        value={regRole}
-                        onChange={e => setRegRole(e.target.value)}
-                        required
-                        className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm"
-                      >
-                        <option value="" disabled>Select your role…</option>
-                        {ROLES.map(r => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* ── Role (join mode only) ── */}
+                    {regMode === 'join' && (
+                      <div>
+                        <label className="block text-slate-300 text-sm font-medium mb-1.5">
+                          Role
+                        </label>
+                        <select
+                          value={regRole}
+                          onChange={e => setRegRole(e.target.value)}
+                          required
+                          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm"
+                        >
+                          <option value="" disabled>Select your role…</option>
+                          {JOIN_ROLES.map(r => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-slate-300 text-sm font-medium mb-1.5">
@@ -309,9 +425,11 @@ export default function Login() {
                       </div>
                     )}
 
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-amber-400/80 text-xs">
-                      Your account will require administrator approval before you can sign in.
-                    </div>
+                    {regMode === 'join' && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-amber-400/80 text-xs">
+                        Your account will require administrator approval before you can sign in.
+                      </div>
+                    )}
 
                     <button
                       type="submit"
@@ -323,7 +441,11 @@ export default function Login() {
                       ) : (
                         <UserPlus size={16} />
                       )}
-                      {regLoading ? 'Submitting…' : 'Request Access'}
+                      {regLoading
+                        ? 'Submitting…'
+                        : regMode === 'create'
+                          ? 'Create Team & Account'
+                          : 'Request Access'}
                     </button>
 
                     <p className="text-center text-slate-500 text-xs pt-1">
