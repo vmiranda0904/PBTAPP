@@ -199,6 +199,9 @@ export default function Login() {
                     Create one
                   </button>
                 </p>
+                <p className="text-center text-slate-600 text-xs">
+                  Your password is the one you chose when you registered.
+                </p>
               </form>
             )}
 

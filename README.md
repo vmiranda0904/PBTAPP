@@ -112,10 +112,17 @@ The app has a single designated admin account, identified by the `VITE_ADMIN_EMA
 1. Make sure `VITE_ADMIN_EMAIL` is set to **your email address** in the GitHub Secrets (see Configuration section above).
 2. Deploy the app (push to `main`).
 3. Open the app and go to the **Create Account** tab on the sign-in page.
-4. Register using **the same email address** you set as `VITE_ADMIN_EMAIL`.
+4. Register using **the same email address** you set as `VITE_ADMIN_EMAIL` and **create a password** (minimum 8 characters). There is no default password — you choose your own during registration.
 5. Because the email matches, your account is **automatically approved** — no approval step required.
 6. You will see an **"Admin Account Created!"** confirmation. Click **Sign In Now**.
-7. Sign in with your admin email and password.
+7. Sign in with your admin email and the password you chose in step 4.
+
+### Forgot your password?
+
+There is no automated password-reset flow. If you forget your password:
+
+- **Regular users** — contact the administrator to have your account reset. The admin can reject the old account in Firebase and approve a new registration from you.
+- **Admin** — delete your account document from the Firebase Firestore `registrations` collection, then repeat the First-time setup steps above to create a new admin account with a new password.
 
 ### Accessing the Admin Panel
 
