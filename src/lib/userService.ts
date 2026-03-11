@@ -152,3 +152,23 @@ export async function updateUserStatus(
   await updateDoc(doc(db, COLLECTION, uid), { status });
   return { success: true, user: { ...user, status } };
 }
+
+export async function getPendingUsers(): Promise<RegisteredUser[]> {
+  const q = query(
+    collection(db, COLLECTION),
+    where('status', '==', 'pending')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data() as RegisteredUser);
+}
+
+export async function adminUpdateUserStatus(
+  uid: string,
+  status: 'approved' | 'rejected'
+): Promise<{ success: boolean; user?: RegisteredUser }> {
+  const user = await getUserById(uid);
+  if (!user) return { success: false };
+  if (user.status !== 'pending') return { success: false };
+  await updateDoc(doc(db, COLLECTION, uid), { status });
+  return { success: true, user: { ...user, status } };
+}
