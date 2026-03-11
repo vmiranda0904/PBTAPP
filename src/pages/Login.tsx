@@ -3,15 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 import { LogIn, UserPlus, Eye, EyeOff, CheckCircle, Download, X } from 'lucide-react';
 
-const POSITIONS = [
-  'Outside Hitter',
-  'Opposite Hitter',
-  'Setter',
-  'Middle Blocker',
-  'Libero',
-  'Defensive Specialist',
-  'Other',
-];
+const ROLES = ['Admin', 'Coach', 'Player', 'Parent'];
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -32,7 +24,7 @@ export default function Login() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
-  const [regPosition, setRegPosition] = useState('');
+  const [regRole, setRegRole] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
@@ -62,8 +54,8 @@ export default function Login() {
       setRegError('Password must be at least 8 characters.');
       return;
     }
-    if (!regPosition) {
-      setRegError('Please select your position.');
+    if (!regRole) {
+      setRegError('Please select your role.');
       return;
     }
 
@@ -72,7 +64,7 @@ export default function Login() {
       name: regName,
       email: regEmail,
       password: regPassword,
-      position: regPosition,
+      role: regRole,
     });
     if (!result.success) {
       setRegError(result.message);
@@ -258,17 +250,17 @@ export default function Login() {
 
                     <div>
                       <label className="block text-slate-300 text-sm font-medium mb-1.5">
-                        Position
+                        Role
                       </label>
                       <select
-                        value={regPosition}
-                        onChange={e => setRegPosition(e.target.value)}
+                        value={regRole}
+                        onChange={e => setRegRole(e.target.value)}
                         required
                         className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm"
                       >
-                        <option value="" disabled>Select your position…</option>
-                        {POSITIONS.map(p => (
-                          <option key={p} value={p}>{p}</option>
+                        <option value="" disabled>Select your role…</option>
+                        {ROLES.map(r => (
+                          <option key={r} value={r}>{r}</option>
                         ))}
                       </select>
                     </div>

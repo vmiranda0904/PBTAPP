@@ -75,7 +75,7 @@ The app sends two types of emails:
    | `{{to_email}}` | The admin's email address (set as the *To* field) |
    | `{{user_name}}` | The registrant's full name |
    | `{{user_email}}` | The registrant's email |
-   | `{{user_position}}` | The registrant's playing position |
+   | `{{user_role}}` | The registrant's role (Admin / Coach / Player / Parent) |
    | `{{approve_url}}` | One-click link to approve the account |
    | `{{reject_url}}` | One-click link to reject the account |
 
@@ -96,7 +96,7 @@ The app sends two types of emails:
 | `VITE_EMAILJS_TEMPLATE_ID` | EmailJS → Email Templates → Template 1 ID |
 | `VITE_EMAILJS_USER_TEMPLATE_ID` | EmailJS → Email Templates → Template 2 ID |
 | `VITE_EMAILJS_PUBLIC_KEY` | EmailJS → Account → Public Key |
-| `VITE_ADMIN_EMAIL` | The email address that receives admin notifications |
+| `VITE_ADMIN_EMAIL` | Set to `primebeachtraining@gmail.com` |
 | `VITE_APP_URL` | `https://vmiranda0904.github.io` |
 
 Once all secrets are added, push to `main` (or re-run the **Deploy to GitHub Pages** workflow) to deploy with email notifications active.
@@ -105,17 +105,18 @@ Once all secrets are added, push to `main` (or re-run the **Deploy to GitHub Pag
 
 ## 🔐 Admin Setup & Login
 
-The app has a single designated admin account, identified by the `VITE_ADMIN_EMAIL` GitHub Secret.
+The app has a single designated admin account. The admin email is **primebeachtraining@gmail.com**, set via the `VITE_ADMIN_EMAIL` GitHub Secret.
 
 ### First-time setup
 
-1. Make sure `VITE_ADMIN_EMAIL` is set to **your email address** in the GitHub Secrets (see Configuration section above).
+1. Make sure `VITE_ADMIN_EMAIL` is set to `primebeachtraining@gmail.com` in the GitHub Secrets (see Configuration section above).
 2. Deploy the app (push to `main`).
 3. Open the app and go to the **Create Account** tab on the sign-in page.
-4. Register using **the same email address** you set as `VITE_ADMIN_EMAIL` and **create a password** (minimum 8 characters). There is no default password — you choose your own during registration.
-5. Because the email matches, your account is **automatically approved** — no approval step required.
-6. You will see an **"Admin Account Created!"** confirmation. Click **Sign In Now**.
-7. Sign in with your admin email and the password you chose in step 4.
+4. Register using **primebeachtraining@gmail.com** and **create a password** (minimum 8 characters). You will choose your own password during registration.
+5. Select **Admin** as your role in the registration form.
+6. Because the email matches `VITE_ADMIN_EMAIL`, your account is **automatically approved** — no approval step required.
+7. You will see an **"Admin Account Created!"** confirmation. Click **Sign In Now**.
+8. Sign in with your admin email and the password you chose in step 4.
 
 ### Forgot your password?
 
