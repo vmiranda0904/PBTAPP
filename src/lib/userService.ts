@@ -7,6 +7,8 @@ import {
   collection,
   query,
   where,
+  onSnapshot,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -107,12 +109,15 @@ export async function getUserById(id: string): Promise<RegisteredUser | null> {
   return snap.exists() ? (snap.data() as RegisteredUser) : null;
 }
 
-export async function createRegistration(fields: {
-  name: string;
-  email: string;
-  password: string;
-  role: string;
-}): Promise<RegisteredUser> {
+export async function createRegistration(
+  fields: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+  },
+  requireApproval = true
+): Promise<RegisteredUser> {
   const id = generateId();
   const approvalToken = generateToken();
   const salt = generateSalt();
@@ -135,7 +140,9 @@ export async function createRegistration(fields: {
     passwordSalt: saltHex,
     avatar: initials,
     role: fields.role,
-    status: isAdminAccount ? 'approved' : 'pending',
+    // Admin accounts are always auto-approved; other accounts are auto-approved
+    // only when the requireApproval setting is false.
+    status: isAdminAccount || !requireApproval ? 'approved' : 'pending',
     approvalToken,
     createdAt: new Date().toISOString(),
   };
@@ -175,4 +182,22 @@ export async function adminUpdateUserStatus(
   if (user.status !== 'pending') return { success: false };
   await updateDoc(doc(db, COLLECTION, uid), { status });
   return { success: true, user: { ...user, status } };
+}
+
+/**
+ * Subscribes to real-time changes in the pending-users list.
+ * Calls `onChange` with each new RegisteredUser document that arrives
+ * (or fires with the initial set on first snapshot).
+ * Returns an unsubscribe function.
+ */
+export function subscribeToPendingUsers(
+  onChange: (users: RegisteredUser[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, COLLECTION),
+    where('status', '==', 'pending')
+  );
+  return onSnapshot(q, snap => {
+    onChange(snap.docs.map(d => d.data() as RegisteredUser));
+  });
 }

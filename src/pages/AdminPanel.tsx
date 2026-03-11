@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import type { Player, Placement } from '../context/AppContext';
+import { getPendingUsers, type RegisteredUser } from '../lib/userService';
+import { getAppSettings, updateAppSettings, type AppSettings } from '../lib/settingsService';
+import {
+  enableAdminPushNotifications,
+  disableAdminPushNotifications,
+  getNotificationPermission,
+} from '../lib/pushNotificationService';
+import { sendStatusNotificationEmail } from '../lib/emailService';
 import {
   ShieldCheck,
   Users,
@@ -15,11 +23,18 @@ import {
   Save,
   X,
   ChevronDown,
+  Settings,
+  UserCheck,
+  Bell,
+  BellOff,
+  Check,
+  Ban,
+  RefreshCw,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'players' | 'stats' | 'points' | 'events';
+type Tab = 'players' | 'stats' | 'points' | 'events' | 'approvals' | 'settings';
 
 const ROLES = [
   'Parent',
@@ -72,6 +87,8 @@ function AdminPanelInner() {
     { id: 'stats', label: 'Stats', icon: Trophy },
     { id: 'points', label: 'Points', icon: Star },
     { id: 'events', label: 'Events', icon: CalendarDays },
+    { id: 'approvals', label: 'Approvals', icon: UserCheck },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -82,11 +99,11 @@ function AdminPanelInner() {
           <ShieldCheck size={22} className="text-amber-400" />
           <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
         </div>
-        <p className="text-slate-400 text-sm">Manage players, stats, points, and events.</p>
+        <p className="text-slate-400 text-sm">Manage players, stats, points, events, approvals, and app settings.</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-800 rounded-xl p-1 w-fit">
+      <div className="flex flex-wrap gap-1 mb-6 bg-slate-800 rounded-xl p-1 w-fit">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -108,6 +125,8 @@ function AdminPanelInner() {
       {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'points' && <PointsTab />}
       {activeTab === 'events' && <EventsTab />}
+      {activeTab === 'approvals' && <ApprovalsTab />}
+      {activeTab === 'settings' && <SettingsTab />}
     </div>
   );
 }
@@ -805,6 +824,323 @@ function EventsTab() {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Approvals Tab ────────────────────────────────────────────────────────────
+
+function ApprovalsTab() {
+  const { approveUser } = useAuth();
+  const [pendingUsers, setPendingUsers] = useState<RegisteredUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const users = await getPendingUsers();
+      setPendingUsers(users);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleDecision(uid: string, userName: string, userEmail: string, status: 'approved' | 'rejected') {
+    setActionLoading(uid);
+    const ok = await approveUser(uid, status);
+    if (ok) {
+      // Send status notification email to the user
+      try {
+        await sendStatusNotificationEmail(userName, userEmail, status);
+      } catch {
+        // email failure is non-blocking
+      }
+      setPendingUsers(prev => prev.filter(u => u.id !== uid));
+      setMessage({ text: `User ${status}.`, ok: true });
+    } else {
+      setMessage({ text: 'Action failed. Please try again.', ok: false });
+    }
+    setActionLoading(null);
+    setTimeout(() => setMessage(null), 3000);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-slate-400 text-sm">
+          {loading ? 'Loading…' : `${pendingUsers.length} pending approval${pendingUsers.length !== 1 ? 's' : ''}`}
+        </p>
+        <button
+          onClick={load}
+          disabled={loading}
+          className="flex items-center gap-2 text-slate-400 hover:text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </div>
+
+      {message && (
+        <div className={`rounded-lg px-4 py-2 text-sm ${message.ok ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+          {message.text}
+        </div>
+      )}
+
+      {!loading && pendingUsers.length === 0 && (
+        <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-400 text-sm">
+          No pending approvals.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {pendingUsers.map(u => (
+          <div key={u.id} className="bg-slate-800 rounded-xl border border-slate-700 p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {u.avatar}
+              </div>
+              <div className="min-w-0">
+                <p className="text-white text-sm font-medium truncate">{u.name}</p>
+                <p className="text-slate-400 text-xs truncate">{u.email} · {u.role}</p>
+                <p className="text-slate-500 text-xs">{new Date(u.createdAt).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                disabled={actionLoading === u.id}
+                onClick={() => handleDecision(u.id, u.name, u.email, 'approved')}
+                className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Check size={13} /> Approve
+              </button>
+              <button
+                disabled={actionLoading === u.id}
+                onClick={() => handleDecision(u.id, u.name, u.email, 'rejected')}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Ban size={13} /> Deny
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Settings Tab ─────────────────────────────────────────────────────────────
+
+function SettingsTab() {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [permissionState, setPermissionState] = useState<NotificationPermission>('default');
+  const [statusMsg, setStatusMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    setPermissionState(getNotificationPermission());
+    getAppSettings().then(s => {
+      setSettings(s);
+      setLoading(false);
+    });
+  }, []);
+
+  function flash(text: string, ok: boolean) {
+    setStatusMsg({ text, ok });
+    setTimeout(() => setStatusMsg(null), 4000);
+  }
+
+  async function handleToggle(key: keyof AppSettings, value: boolean) {
+    if (!settings) return;
+    const updated = { ...settings, [key]: value };
+    setSettings(updated);
+    setSaving(true);
+    try {
+      await updateAppSettings({ [key]: value });
+      flash('Setting saved.', true);
+    } catch {
+      setSettings(settings); // revert
+      flash('Failed to save setting.', false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleEnablePush() {
+    setPushLoading(true);
+    try {
+      const base = (import.meta.env.BASE_URL as string) ?? '/';
+      const swReg = await navigator.serviceWorker.getRegistration(
+        `${base}firebase-messaging-sw.js`
+      );
+      const token = await enableAdminPushNotifications(swReg);
+      setPermissionState(getNotificationPermission());
+      if (token) {
+        setSettings(prev => prev ? { ...prev, pushNotificationsEnabled: true, adminFcmToken: token } : prev);
+        await updateAppSettings({ pushNotificationsEnabled: true });
+        flash('Push notifications enabled on this device.', true);
+      } else {
+        flash('Could not get push token. Check browser permissions and VAPID key.', false);
+      }
+    } catch {
+      flash('Failed to enable push notifications.', false);
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushLoading(true);
+    try {
+      await disableAdminPushNotifications();
+      setSettings(prev => prev ? { ...prev, pushNotificationsEnabled: false, adminFcmToken: null } : prev);
+      flash('Push notifications disabled.', true);
+    } catch {
+      flash('Failed to disable push notifications.', false);
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <span className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!settings) return null;
+
+  const pushSupported = 'Notification' in window && 'serviceWorker' in navigator;
+
+  return (
+    <div className="space-y-6 max-w-lg">
+      {statusMsg && (
+        <div className={`rounded-lg px-4 py-2 text-sm ${statusMsg.ok ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+          {statusMsg.text}
+        </div>
+      )}
+
+      {/* Security Section */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 space-y-4">
+        <h2 className="text-white font-semibold flex items-center gap-2">
+          <ShieldCheck size={17} className="text-amber-400" />
+          Security
+        </h2>
+
+        {/* Require Approval Toggle */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-white text-sm font-medium">Require user approval</p>
+            <p className="text-slate-400 text-xs mt-0.5">
+              When enabled, new sign-ups must be approved by you before they can access the app.
+              Disable to auto-approve all new users.
+            </p>
+          </div>
+          <button
+            disabled={saving}
+            onClick={() => handleToggle('requireApproval', !settings.requireApproval)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full flex-shrink-0 transition-colors ${
+              settings.requireApproval ? 'bg-blue-600' : 'bg-slate-600'
+            } disabled:opacity-50`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                settings.requireApproval ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Notifications Section */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 space-y-4">
+        <h2 className="text-white font-semibold flex items-center gap-2">
+          <Bell size={17} className="text-cyan-400" />
+          Push Notifications
+        </h2>
+
+        {!pushSupported && (
+          <p className="text-amber-400 text-xs bg-amber-500/10 rounded-lg px-3 py-2">
+            Your browser does not support push notifications.
+          </p>
+        )}
+
+        {pushSupported && permissionState === 'denied' && (
+          <p className="text-red-400 text-xs bg-red-500/10 rounded-lg px-3 py-2">
+            Notifications are blocked in your browser. Please allow notifications in your browser
+            settings and then enable them here.
+          </p>
+        )}
+
+        {/* Push notifications toggle */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-white text-sm font-medium">Notify on new sign-ups</p>
+            <p className="text-slate-400 text-xs mt-0.5">
+              Receive a push notification on this device whenever someone signs up,
+              so you can approve or deny them promptly.
+            </p>
+          </div>
+          <button
+            disabled={saving || pushLoading || !pushSupported}
+            onClick={() => handleToggle('pushNotificationsEnabled', !settings.pushNotificationsEnabled)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full flex-shrink-0 transition-colors ${
+              settings.pushNotificationsEnabled ? 'bg-cyan-600' : 'bg-slate-600'
+            } disabled:opacity-50`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                settings.pushNotificationsEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Enable / Disable push on this device */}
+        {pushSupported && (
+          <div className="pt-2 border-t border-slate-700">
+            <p className="text-slate-400 text-xs mb-3">
+              {settings.adminFcmToken
+                ? 'This device is registered to receive push notifications.'
+                : 'Register this device to receive push notifications even when the app is closed.'}
+            </p>
+            {settings.adminFcmToken ? (
+              <button
+                disabled={pushLoading}
+                onClick={handleDisablePush}
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {pushLoading ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <BellOff size={15} />
+                )}
+                Unregister this device
+              </button>
+            ) : (
+              <button
+                disabled={pushLoading || permissionState === 'denied'}
+                onClick={handleEnablePush}
+                className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                {pushLoading ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Bell size={15} />
+                )}
+                Enable push on this device
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

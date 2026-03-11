@@ -1,11 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   getUserByEmail,
   createRegistration,
   verifyPassword,
+  adminUpdateUserStatus,
+  subscribeToPendingUsers,
   type RegisteredUser,
 } from '../lib/userService';
 import { sendApprovalEmail } from '../lib/emailService';
+import { getAppSettings } from '../lib/settingsService';
+import { showBrowserNotification } from '../lib/pushNotificationService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +39,7 @@ interface AuthContextType {
     role: string;
   }) => Promise<RegisterResult>;
   logout: () => void;
+  approveUser: (uid: string, status: 'approved' | 'rejected') => Promise<boolean>;
   isAuthenticated: boolean;
   isAdmin: boolean;
 }
@@ -67,6 +72,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const isAdmin = !!user && !!ADMIN_EMAIL && user.email.toLowerCase() === ADMIN_EMAIL;
+
+  // ── Admin-side pending-user watcher ─────────────────────────────────────────
+  // When the admin is logged in and push notifications are enabled, subscribe to
+  // real-time Firestore updates for pending users. Each newly-pending user triggers
+  // a browser notification directly in the admin's session.
+  const seenPendingIds = useRef<Set<string>>(new Set());
+  const isFirstSnapshot = useRef(true);
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    seenPendingIds.current = new Set();
+    isFirstSnapshot.current = true;
+
+    let unsubscribe: (() => void) | null = null;
+    let active = true;
+
+    getAppSettings().then(settings => {
+      if (!active || !settings.pushNotificationsEnabled) return;
+
+      unsubscribe = subscribeToPendingUsers((users: RegisteredUser[]) => {
+        if (isFirstSnapshot.current) {
+          // Seed the set with existing pending users so we only notify for new ones
+          users.forEach(u => seenPendingIds.current.add(u.id));
+          isFirstSnapshot.current = false;
+          return;
+        }
+
+        for (const u of users) {
+          if (!seenPendingIds.current.has(u.id)) {
+            seenPendingIds.current.add(u.id);
+            showBrowserNotification(
+              'New Sign-Up Request',
+              `${u.name} (${u.role}) wants to join PBT Sports.`,
+              `signup-${u.id}`,
+            );
+          }
+        }
+      });
+    });
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
     const dbUser = await getUserByEmail(email);
@@ -109,19 +160,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: 'An account with that email already exists.' };
     }
 
-    const newUser = await createRegistration(fields);
+    // Check app-wide approval setting before creating the registration
+    const settings = await getAppSettings();
+    const newUser = await createRegistration(fields, settings.requireApproval);
 
     let emailSent = true;
-    // Admin accounts are auto-approved — no approval email needed
     if (newUser.status === 'pending') {
+      // Send approval email to admin
       try {
         await sendApprovalEmail(newUser);
       } catch {
         emailSent = false;
       }
+      // Push notification to the admin is handled by the Firestore real-time
+      // listener set up in the admin's browser session (see useEffect at line 82
+      // in AuthContext.tsx).
     }
 
     return { success: true, emailSent, autoApproved: newUser.status === 'approved' };
+  };
+
+  const approveUser = async (uid: string, status: 'approved' | 'rejected'): Promise<boolean> => {
+    const result = await adminUpdateUserStatus(uid, status);
+    return result.success;
   };
 
   const logout = () => {
@@ -129,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user, isAdmin }}>
+    <AuthContext.Provider value={{ user, login, register, logout, approveUser, isAuthenticated: !!user, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );
