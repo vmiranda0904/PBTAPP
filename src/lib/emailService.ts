@@ -16,7 +16,7 @@ const PUBLIC_KEY = (import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string | undefine
 /**
  * Sends an approval-request email to the admin when a new user registers.
  * Template variables: {{to_email}}, {{user_name}}, {{user_email}},
- *   {{user_position}}, {{approve_url}}, {{reject_url}}
+ *   {{user_role}}, {{approve_url}}, {{reject_url}}
  */
 export async function sendApprovalEmail(user: RegisteredUser): Promise<void> {
   if (!SERVICE_ID || !ADMIN_TEMPLATE_ID || !PUBLIC_KEY) return;
@@ -32,7 +32,7 @@ export async function sendApprovalEmail(user: RegisteredUser): Promise<void> {
       to_email: ADMIN_EMAIL,
       user_name: user.name,
       user_email: user.email,
-      user_position: user.position,
+      user_role: user.role,
       approve_url: approveUrl,
       reject_url: rejectUrl,
     },

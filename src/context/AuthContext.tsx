@@ -13,7 +13,7 @@ export interface AuthUser {
   id: string;
   name: string;
   avatar: string;
-  position: string;
+  role: string;
   email: string;
 }
 
@@ -22,7 +22,7 @@ export type LoginResult =
   | { success: false; message: string };
 
 export type RegisterResult =
-  | { success: true; emailSent: boolean }
+  | { success: true; emailSent: boolean; autoApproved: boolean }
   | { success: false; message: string };
 
 interface AuthContextType {
@@ -32,7 +32,7 @@ interface AuthContextType {
     name: string;
     email: string;
     password: string;
-    position: string;
+    role: string;
   }) => Promise<RegisterResult>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -45,7 +45,7 @@ const STORAGE_KEY = 'pbt_auth_user';
 const ADMIN_EMAIL = ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '').toLowerCase().trim();
 
 function toAuthUser(u: RegisteredUser): AuthUser {
-  return { id: u.id, name: u.name, avatar: u.avatar, position: u.position, email: u.email };
+  return { id: u.id, name: u.name, avatar: u.avatar, role: u.role, email: u.email };
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     name: string;
     email: string;
     password: string;
-    position: string;
+    role: string;
   }): Promise<RegisterResult> => {
     const existing = await getUserByEmail(fields.email);
     if (existing) {
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    return { success: true, emailSent };
+    return { success: true, emailSent, autoApproved: newUser.status === 'approved' };
   };
 
   const logout = () => {

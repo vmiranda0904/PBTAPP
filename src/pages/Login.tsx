@@ -3,15 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 import { LogIn, UserPlus, Eye, EyeOff, CheckCircle, Download, X } from 'lucide-react';
 
-const POSITIONS = [
-  'Outside Hitter',
-  'Opposite Hitter',
-  'Setter',
-  'Middle Blocker',
-  'Libero',
-  'Defensive Specialist',
-  'Other',
-];
+const ROLES = ['Admin', 'Coach', 'Player', 'Parent'];
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -32,11 +24,12 @@ export default function Login() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
-  const [regPosition, setRegPosition] = useState('');
+  const [regRole, setRegRole] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
+  const [regAutoApproved, setRegAutoApproved] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,8 +54,8 @@ export default function Login() {
       setRegError('Password must be at least 8 characters.');
       return;
     }
-    if (!regPosition) {
-      setRegError('Please select your position.');
+    if (!regRole) {
+      setRegError('Please select your role.');
       return;
     }
 
@@ -71,17 +64,18 @@ export default function Login() {
       name: regName,
       email: regEmail,
       password: regPassword,
-      position: regPosition,
+      role: regRole,
     });
     if (!result.success) {
       setRegError(result.message);
     } else {
-      if (!result.emailSent) {
+      if (!result.autoApproved && !result.emailSent) {
         setRegError(
           'Your account was submitted, but the admin notification email could not be sent. ' +
           'Please contact the administrator directly.'
         );
       }
+      setRegAutoApproved(result.autoApproved ?? false);
       setRegSuccess(true);
     }
     setRegLoading(false);
@@ -197,6 +191,9 @@ export default function Login() {
                     Create one
                   </button>
                 </p>
+                <p className="text-center text-slate-600 text-xs">
+                  Your password is the one you chose when you registered.
+                </p>
               </form>
             )}
 
@@ -206,16 +203,19 @@ export default function Login() {
                 {regSuccess ? (
                   <div className="text-center py-6 space-y-4">
                     <CheckCircle size={48} className="text-green-400 mx-auto" />
-                    <h3 className="text-white text-lg font-semibold">Request Submitted!</h3>
+                    <h3 className="text-white text-lg font-semibold">
+                      {regAutoApproved ? 'Admin Account Created!' : 'Request Submitted!'}
+                    </h3>
                     <p className="text-slate-400 text-sm leading-relaxed">
-                      Your account request has been sent for approval. You will be able to sign in once
-                      the administrator approves your request.
+                      {regAutoApproved
+                        ? 'Your admin account is ready. You can sign in immediately using your email and password.'
+                        : 'Your account request has been sent for approval. You will be able to sign in once the administrator approves your request.'}
                     </p>
                     <button
-                      onClick={() => { setTab('signin'); setRegSuccess(false); }}
+                      onClick={() => { setTab('signin'); setRegSuccess(false); setRegAutoApproved(false); }}
                       className="text-blue-400 hover:text-blue-300 text-sm font-medium"
                     >
-                      Back to Sign In
+                      {regAutoApproved ? 'Sign In Now' : 'Back to Sign In'}
                     </button>
                   </div>
                 ) : (
@@ -250,17 +250,17 @@ export default function Login() {
 
                     <div>
                       <label className="block text-slate-300 text-sm font-medium mb-1.5">
-                        Position
+                        Role
                       </label>
                       <select
-                        value={regPosition}
-                        onChange={e => setRegPosition(e.target.value)}
+                        value={regRole}
+                        onChange={e => setRegRole(e.target.value)}
                         required
                         className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm"
                       >
-                        <option value="" disabled>Select your position…</option>
-                        {POSITIONS.map(p => (
-                          <option key={p} value={p}>{p}</option>
+                        <option value="" disabled>Select your role…</option>
+                        {ROLES.map(r => (
+                          <option key={r} value={r}>{r}</option>
                         ))}
                       </select>
                     </div>

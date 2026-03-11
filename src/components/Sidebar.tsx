@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Star,
   Trophy,
+  Crown,
   Download,
   CheckCircle,
   LogOut,
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/points', label: 'Points System', icon: Star },
   { to: '/rankings', label: 'Rankings', icon: Trophy },
+  { to: '/membership', label: 'Membership', icon: Crown },
 ];
 
 export default function Sidebar() {

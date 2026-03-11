@@ -143,7 +143,7 @@ export default function Dashboard() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-white text-sm font-medium truncate">{u.name}</p>
-                      <p className="text-slate-400 text-xs truncate">{u.email} · {u.position}</p>
+                      <p className="text-slate-400 text-xs truncate">{u.email} · {u.role}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">

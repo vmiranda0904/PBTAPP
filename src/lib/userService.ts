@@ -19,7 +19,7 @@ export interface RegisteredUser {
   passwordHash: string;
   passwordSalt: string;
   avatar: string;
-  position: string;
+  role: string;
   status: UserStatus;
   approvalToken: string;
   createdAt: string;
@@ -111,7 +111,7 @@ export async function createRegistration(fields: {
   name: string;
   email: string;
   password: string;
-  position: string;
+  role: string;
 }): Promise<RegisteredUser> {
   const id = generateId();
   const approvalToken = generateToken();
@@ -134,7 +134,7 @@ export async function createRegistration(fields: {
     passwordHash: await hashPassword(fields.password, salt),
     passwordSalt: saltHex,
     avatar: initials,
-    position: fields.position,
+    role: fields.role,
     status: isAdminAccount ? 'approved' : 'pending',
     approvalToken,
     createdAt: new Date().toISOString(),
