@@ -26,6 +26,7 @@ export interface RegisteredUser {
 }
 
 const COLLECTION = 'registrations';
+const ADMIN_EMAIL = ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '').toLowerCase().trim();
 
 // ─── Password hashing (PBKDF2 via Web Crypto API) ────────────────────────────
 
@@ -123,15 +124,18 @@ export async function createRegistration(fields: {
     .toUpperCase()
     .slice(0, 2);
 
+  const emailNorm = fields.email.toLowerCase().trim();
+  const isAdminAccount = !!ADMIN_EMAIL && emailNorm === ADMIN_EMAIL;
+
   const user: RegisteredUser = {
     id,
     name: fields.name.trim(),
-    email: fields.email.toLowerCase().trim(),
+    email: emailNorm,
     passwordHash: await hashPassword(fields.password, salt),
     passwordSalt: saltHex,
     avatar: initials,
     position: fields.position,
-    status: 'pending',
+    status: isAdminAccount ? 'approved' : 'pending',
     approvalToken,
     createdAt: new Date().toISOString(),
   };

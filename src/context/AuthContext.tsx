@@ -112,10 +112,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const newUser = await createRegistration(fields);
 
     let emailSent = true;
-    try {
-      await sendApprovalEmail(newUser);
-    } catch {
-      emailSent = false;
+    // Admin accounts are auto-approved — no approval email needed
+    if (newUser.status === 'pending') {
+      try {
+        await sendApprovalEmail(newUser);
+      } catch {
+        emailSent = false;
+      }
     }
 
     return { success: true, emailSent };

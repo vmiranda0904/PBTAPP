@@ -11,6 +11,7 @@ import {
   Download,
   CheckCircle,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -29,7 +30,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const { players, currentUserId } = useApp();
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
   const me = players.find(p => p.id === currentUserId);
   const { canInstall, isInstalled, triggerInstall } = useInstallPrompt();
 
@@ -67,6 +68,23 @@ export default function Sidebar() {
             {label}
           </NavLink>
         ))}
+
+        {/* Admin Panel link — only visible to admins */}
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                isActive
+                  ? 'bg-amber-600 text-white'
+                  : 'text-amber-400 hover:text-white hover:bg-amber-600/20'
+              }`
+            }
+          >
+            <ShieldCheck size={18} />
+            Admin Panel
+          </NavLink>
+        )}
       </nav>
 
       {/* Install App */}
