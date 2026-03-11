@@ -33,6 +33,7 @@ export default function Login() {
   const [regLoading, setRegLoading] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [regAutoApproved, setRegAutoApproved] = useState(false);
+  const [regIsAdmin, setRegIsAdmin] = useState(false);
   const [newTeamCode, setNewTeamCode] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
 
@@ -83,6 +84,7 @@ export default function Login() {
         );
       }
       setRegAutoApproved(result.autoApproved ?? false);
+      setRegIsAdmin(result.isAdminRegistration ?? false);
       setNewTeamCode(result.teamCode ?? '');
       setRegSuccess(true);
     }
@@ -110,6 +112,7 @@ export default function Login() {
     setRegError('');
     setRegSuccess(false);
     setRegAutoApproved(false);
+    setRegIsAdmin(false);
     setNewTeamCode('');
     setCodeCopied(false);
   };
@@ -237,7 +240,11 @@ export default function Login() {
                   <div className="text-center py-6 space-y-4">
                     <CheckCircle size={48} className="text-green-400 mx-auto" />
                     <h3 className="text-white text-lg font-semibold">
-                      {regAutoApproved ? 'Team Created!' : 'Request Submitted!'}
+                      {regAutoApproved && regIsAdmin
+                        ? 'Admin Account Created!'
+                        : regAutoApproved
+                        ? 'Account Ready!'
+                        : 'Request Submitted!'}
                     </h3>
                     <p className="text-slate-400 text-sm leading-relaxed">
                       {regAutoApproved
