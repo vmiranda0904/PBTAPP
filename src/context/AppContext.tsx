@@ -23,7 +23,7 @@ export interface Player {
   id: string;
   name: string;
   avatar: string;
-  position: string;
+  role: string;
   totalPoints: number;
   practiceAttendance: number;
   tournamentsPlayed: number;
@@ -99,31 +99,31 @@ export function calcTournamentPoints(placement: Placement): number {
 
 const SAMPLE_PLAYERS: Player[] = [
   {
-    id: 'p1', name: 'Alex Rivera', avatar: 'AR', position: 'Outside Hitter',
+    id: 'p1', name: 'Alex Rivera', avatar: 'AR', role: 'Player',
     totalPoints: 170, practiceAttendance: 8, tournamentsPlayed: 3, wins: 12, losses: 4,
     placements: { '1st': 1, '2nd': 1, '3rd': 0, '4th': 1 },
     stats: { aces: 24, kills: 87, errors: 15, digs: 42, assists: 8, blocks: 11 },
   },
   {
-    id: 'p2', name: 'Jordan Blake', avatar: 'JB', position: 'Setter',
+    id: 'p2', name: 'Jordan Blake', avatar: 'JB', role: 'Player',
     totalPoints: 130, practiceAttendance: 6, tournamentsPlayed: 2, wins: 8, losses: 5,
     placements: { '1st': 0, '2nd': 1, '3rd': 1, '4th': 0 },
     stats: { aces: 10, kills: 30, errors: 12, digs: 55, assists: 120, blocks: 5 },
   },
   {
-    id: 'p3', name: 'Morgan Chen', avatar: 'MC', position: 'Libero',
+    id: 'p3', name: 'Morgan Chen', avatar: 'MC', role: 'Player',
     totalPoints: 100, practiceAttendance: 5, tournamentsPlayed: 2, wins: 7, losses: 6,
     placements: { '1st': 0, '2nd': 0, '3rd': 1, '4th': 1 },
     stats: { aces: 6, kills: 18, errors: 8, digs: 98, assists: 15, blocks: 2 },
   },
   {
-    id: 'p4', name: 'Taylor Davis', avatar: 'TD', position: 'Middle Blocker',
+    id: 'p4', name: 'Taylor Davis', avatar: 'TD', role: 'Player',
     totalPoints: 80, practiceAttendance: 4, tournamentsPlayed: 1, wins: 5, losses: 4,
     placements: { '1st': 0, '2nd': 0, '3rd': 0, '4th': 1 },
     stats: { aces: 18, kills: 65, errors: 20, digs: 22, assists: 5, blocks: 34 },
   },
   {
-    id: 'p5', name: 'Sam Nguyen', avatar: 'SN', position: 'Opposite Hitter',
+    id: 'p5', name: 'Sam Nguyen', avatar: 'SN', role: 'Player',
     totalPoints: 60, practiceAttendance: 3, tournamentsPlayed: 1, wins: 4, losses: 5,
     placements: { '1st': 0, '2nd': 0, '3rd': 0, '4th': 0 },
     stats: { aces: 14, kills: 58, errors: 22, digs: 19, assists: 3, blocks: 9 },

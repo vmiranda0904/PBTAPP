@@ -225,7 +225,7 @@ export default function Dashboard() {
                 {topPlayer.avatar}
               </div>
               <p className="text-white font-semibold">{topPlayer.name}</p>
-              <p className="text-slate-400 text-sm">{topPlayer.position}</p>
+              <p className="text-slate-400 text-sm">{topPlayer.role}</p>
               <div className="mt-3 bg-slate-700/50 rounded-lg p-3">
                 <p className="text-yellow-400 text-2xl font-bold">{topPlayer.totalPoints}</p>
                 <p className="text-slate-400 text-xs">Total Points</p>
