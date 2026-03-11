@@ -36,11 +36,13 @@ interface AuthContextType {
   }) => Promise<RegisterResult>;
   logout: () => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'pbt_auth_user';
+const ADMIN_EMAIL = ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '').toLowerCase().trim();
 
 function toAuthUser(u: RegisteredUser): AuthUser {
   return { id: u.id, name: u.name, avatar: u.avatar, position: u.position, email: u.email };
@@ -63,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(STORAGE_KEY);
     }
   }, [user]);
+
+  const isAdmin = !!user && !!ADMIN_EMAIL && user.email.toLowerCase() === ADMIN_EMAIL;
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
     const dbUser = await getUserByEmail(email);
@@ -122,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );
