@@ -188,8 +188,8 @@ export default function App() {
     };
   }, [members, messages, tasks]);
 
-  const addMessage = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const addMessage = (formEvent: React.FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
     if (!messageDraft.content.trim()) return;
 
     setMessages((current) => [
@@ -205,8 +205,8 @@ export default function App() {
     setMessageDraft((current) => ({ ...current, content: '' }));
   };
 
-  const addEvent = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const addEvent = (formEvent: React.FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
     if (!eventDraft.title || !eventDraft.date || !eventDraft.time) return;
 
     setEvents((current) => [
@@ -223,8 +223,8 @@ export default function App() {
     setEventDraft({ title: '', date: '', time: '', location: '', owner: eventDraft.owner });
   };
 
-  const addMember = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const addMember = (formEvent: React.FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
     if (!memberDraft.name || !memberDraft.role || !memberDraft.team) return;
 
     setMembers((current) => [
@@ -285,7 +285,7 @@ export default function App() {
                     <select
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none ring-0"
                       value={messageDraft.channel}
-                      onChange={(event) => setMessageDraft((current) => ({ ...current, channel: event.target.value }))}
+                      onChange={(e) => setMessageDraft((current) => ({ ...current, channel: e.target.value }))}
                     >
                       <option>Announcements</option>
                       <option>Operations</option>
@@ -298,7 +298,7 @@ export default function App() {
                     <input
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       value={messageDraft.author}
-                      onChange={(event) => setMessageDraft((current) => ({ ...current, author: event.target.value }))}
+                      onChange={(e) => setMessageDraft((current) => ({ ...current, author: e.target.value }))}
                     />
                   </label>
                   <label className="space-y-2 text-sm text-slate-300">
@@ -307,7 +307,7 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Share an update with your team"
                       value={messageDraft.content}
-                      onChange={(event) => setMessageDraft((current) => ({ ...current, content: event.target.value }))}
+                      onChange={(e) => setMessageDraft((current) => ({ ...current, content: e.target.value }))}
                     />
                   </label>
                 </div>
@@ -385,14 +385,14 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Sprint planning"
                       value={eventDraft.title}
-                      onChange={(event) => setEventDraft((current) => ({ ...current, title: event.target.value }))}
+                      onChange={(e) => setEventDraft((current) => ({ ...current, title: e.target.value }))}
                     />
                   </Field>
                   <Field label="Owner">
                     <input
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       value={eventDraft.owner}
-                      onChange={(event) => setEventDraft((current) => ({ ...current, owner: event.target.value }))}
+                      onChange={(e) => setEventDraft((current) => ({ ...current, owner: e.target.value }))}
                     />
                   </Field>
                   <Field label="Date">
@@ -400,7 +400,7 @@ export default function App() {
                       type="date"
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       value={eventDraft.date}
-                      onChange={(event) => setEventDraft((current) => ({ ...current, date: event.target.value }))}
+                      onChange={(e) => setEventDraft((current) => ({ ...current, date: e.target.value }))}
                     />
                   </Field>
                   <Field label="Time">
@@ -408,7 +408,7 @@ export default function App() {
                       type="time"
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       value={eventDraft.time}
-                      onChange={(event) => setEventDraft((current) => ({ ...current, time: event.target.value }))}
+                      onChange={(e) => setEventDraft((current) => ({ ...current, time: e.target.value }))}
                     />
                   </Field>
                   <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
@@ -417,7 +417,7 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Main conference room"
                       value={eventDraft.location}
-                      onChange={(event) => setEventDraft((current) => ({ ...current, location: event.target.value }))}
+                      onChange={(e) => setEventDraft((current) => ({ ...current, location: e.target.value }))}
                     />
                   </label>
                 </div>
@@ -462,7 +462,7 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Add a teammate"
                       value={memberDraft.name}
-                      onChange={(event) => setMemberDraft((current) => ({ ...current, name: event.target.value }))}
+                      onChange={(e) => setMemberDraft((current) => ({ ...current, name: e.target.value }))}
                     />
                   </Field>
                   <Field label="Role">
@@ -470,7 +470,7 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Customer Success Manager"
                       value={memberDraft.role}
-                      onChange={(event) => setMemberDraft((current) => ({ ...current, role: event.target.value }))}
+                      onChange={(e) => setMemberDraft((current) => ({ ...current, role: e.target.value }))}
                     />
                   </Field>
                   <Field label="Team">
@@ -478,7 +478,7 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Support"
                       value={memberDraft.team}
-                      onChange={(event) => setMemberDraft((current) => ({ ...current, team: event.target.value }))}
+                      onChange={(e) => setMemberDraft((current) => ({ ...current, team: e.target.value }))}
                     />
                   </Field>
                   <Field label="Location">
@@ -486,7 +486,7 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Remote"
                       value={memberDraft.location}
-                      onChange={(event) => setMemberDraft((current) => ({ ...current, location: event.target.value }))}
+                      onChange={(e) => setMemberDraft((current) => ({ ...current, location: e.target.value }))}
                     />
                   </Field>
                   <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
@@ -494,10 +494,10 @@ export default function App() {
                     <select
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       value={memberDraft.status}
-                      onChange={(event) =>
+                      onChange={(e) =>
                         setMemberDraft((current) => ({
                           ...current,
-                          status: event.target.value as TeamMember['status'],
+                          status: e.target.value as TeamMember['status'],
                         }))
                       }
                     >
