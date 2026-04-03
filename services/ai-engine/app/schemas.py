@@ -124,6 +124,7 @@ class VideoJob(BaseModel):
     user_id: str
     team_id: str
     status: JobStatus
+    progress: int = 0
     processing_stage: str = 'accepted'
     sport: str
     team_name: str = 'Opponent team'

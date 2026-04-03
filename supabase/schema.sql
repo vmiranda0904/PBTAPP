@@ -32,3 +32,41 @@ create table if not exists subscriptions (
 );
 
 create index if not exists subscriptions_customer_email_idx on subscriptions (customer_email);
+
+create table if not exists jobs (
+  id uuid primary key,
+  user_id text not null,
+  team_id text not null,
+  status text not null,
+  progress int not null default 0,
+  processing_stage text,
+  sport text not null,
+  team_name text not null default 'Opponent team',
+  file_name text not null,
+  content_type text,
+  file_size_bytes int default 0,
+  storage_path text,
+  video_url text,
+  report_storage_path text,
+  pdf_storage_path text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  started_at timestamptz,
+  completed_at timestamptz,
+  last_error_at timestamptz,
+  video_hash text,
+  error text,
+  retry_count int not null default 0,
+  max_retries int not null default 0,
+  timings_ms jsonb not null default '{}'::jsonb,
+  result jsonb,
+  result_url text,
+  download_url text,
+  pdf_report_url text
+);
+
+create index if not exists jobs_user_id_idx on jobs (user_id);
+create index if not exists jobs_team_id_idx on jobs (team_id);
+create index if not exists jobs_status_idx on jobs (status);
+
+alter table jobs add column if not exists progress int not null default 0;

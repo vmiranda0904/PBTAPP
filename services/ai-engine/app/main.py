@@ -185,6 +185,7 @@ async def create_job(
         user_id=owner_user_id,
         team_id=owner_team_id,
         status='queued',
+        progress=5,
         processing_stage='accepted',
         sport=normalized_sport,
         team_name=normalized_team_name,
@@ -205,14 +206,17 @@ async def create_job(
         job.video_url = get_public_url(storage_path)
         if not job.video_url:
             log_event('job_public_url_unavailable', job_id=job.id, storage_path=storage_path)
+        job.progress = max(job.progress, 10)
         job.processing_stage = 'uploaded'
         job = save_job(job)
         enqueue_job(job.id)
+        job.progress = max(job.progress, 15)
         job.processing_stage = 'queued'
         job = save_job(job)
         log_event('job_created', job_id=job.id, user_id=owner_user_id, team_id=owner_team_id, file_size_bytes=file_size)
     except Exception as exc:
         job.status = 'failed'
+        job.progress = 100
         job.processing_stage = 'upload_failed'
         job.error = str(exc)
         job = save_job(job)
