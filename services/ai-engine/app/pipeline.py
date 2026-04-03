@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 from datetime import datetime, timezone
 
-from .config import AI_ENGINE_MAX_RETRIES, PIPELINE_DEFAULTS, SUPABASE_STORAGE_BUCKET, detect_device, pipeline_defaults_dict
+from .config import AI_ENGINE_MAX_RETRIES, PIPELINE_DEFAULTS, SUPABASE_PROJECT_HOST, SUPABASE_STORAGE_BUCKET, detect_device, pipeline_defaults_dict
 from .defense_engine import defensive_scheme
 from .job_store import find_cached_job, get_job, save_job
 from .live_insights import generate_live_insights
@@ -42,7 +42,7 @@ def _sha256_for_bytes(payload: bytes) -> tuple[str, int]:
 def _validate_video_url(video_url: str) -> None:
     parsed = urlparse(video_url)
     expected_prefix = f'/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/'
-    if parsed.scheme != 'https' or not parsed.netloc.endswith('.supabase.co') or not parsed.path.startswith(expected_prefix):
+    if parsed.scheme != 'https' or parsed.netloc != SUPABASE_PROJECT_HOST or not parsed.path.startswith(expected_prefix):
         raise RuntimeError('Invalid video URL source.')
 
 

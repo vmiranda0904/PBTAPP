@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import urlparse
 from dataclasses import asdict, dataclass
 
 
@@ -26,6 +27,7 @@ AI_ENGINE_MAX_RETRIES = int(os.environ.get('AI_ENGINE_MAX_RETRIES', '2'))
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
 SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'videos').strip() or 'videos'
+SUPABASE_PROJECT_HOST = urlparse(SUPABASE_URL).netloc if SUPABASE_URL else ''
 
 
 class ConfigurationError(RuntimeError):

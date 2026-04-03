@@ -15,7 +15,7 @@ def generate_report(data: dict[str, object]) -> bytes:
     stats = data.get('stats', {})
     if not isinstance(stats, dict):
         stats = {}
-    insights = data.get('insights') or []
+    insights = data.get('insights', [])
     if not isinstance(insights, list):
         insights = []
 

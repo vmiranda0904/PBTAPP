@@ -15,7 +15,7 @@ from .schemas import CreateJobResponse, HealthResponse, VideoJob
 from .storage import download_bytes, get_public_url, upload_bytes
 from .worker import enqueue_job, recover_pending_jobs, start_worker
 
-JOB_ID_PATTERN = re.compile(r'^[0-9a-fA-F-]{36}$')
+JOB_ID_PATTERN = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
 
 UserIdHeader = Annotated[str | None, Header(alias='X-User-Id')]
