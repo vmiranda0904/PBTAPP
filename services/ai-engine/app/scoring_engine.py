@@ -13,5 +13,5 @@ def calculate_score(stats: dict[str, float]) -> float:
     return round(score, 2)
 
 
-def rank_athletes(players: list[dict[str, object]]) -> list[dict[str, object]]:
-    return sorted(players, key=lambda player: float(player['score']), reverse=True)
+def rank_athletes(players: list[object]) -> list[object]:
+    return sorted(players, key=lambda player: float(player.score), reverse=True)

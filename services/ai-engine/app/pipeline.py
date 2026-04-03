@@ -220,19 +220,17 @@ def process_video_job(job: VideoJob, uploaded_path: Path) -> None:
         priority_alerts = [PriorityAlert(**entry) for entry in prioritize_insights(live_insights)]
         playbook = [PlaybookItem(**entry) for entry in generate_playbook(tendency_map)]
         defense_plan = defensive_scheme(tendency_map)
-        athlete_rankings = [
-            AthleteRanking(
-                id=f'player-{player_id}',
-                name=f'Player {player_id}',
-                score=calculate_score(stats),
-                stats=stats,
-            )
-            for player_id, stats in player_stats.items()
-        ]
-        athlete_rankings = [
-            AthleteRanking.model_validate(entry)
-            for entry in rank_athletes([ranking.model_dump() for ranking in athlete_rankings])
-        ]
+        athlete_rankings = rank_athletes(
+            [
+                AthleteRanking(
+                    id=f'player-{player_id}',
+                    name=f'Player {player_id}',
+                    score=calculate_score(stats),
+                    stats=stats,
+                )
+                for player_id, stats in player_stats.items()
+            ]
+        )
         timings.tendency_ms = round((time.perf_counter() - tendency_start) * 1000, 2)
         timings.weakness_ms = timings.tendency_ms
         timings.gameplan_ms = timings.tendency_ms

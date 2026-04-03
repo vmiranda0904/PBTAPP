@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Lock
 
 from .schemas import VideoJob
@@ -11,7 +11,7 @@ _LOCK = Lock()
 
 def save_job(job: VideoJob) -> VideoJob:
     with _LOCK:
-        job.updated_at = datetime.utcnow()
+        job.updated_at = datetime.now(timezone.utc)
         _JOBS[job.id] = job
         return job
 

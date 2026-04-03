@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -116,7 +116,7 @@ class ProcessingReport(BaseModel):
     playbook: list[PlaybookItem] = Field(default_factory=list)
     defensive_scheme: dict[str, str] = Field(default_factory=dict)
     pdf_report_url: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class VideoJob(BaseModel):
@@ -125,8 +125,8 @@ class VideoJob(BaseModel):
     sport: str
     team_name: str = 'Opponent team'
     file_name: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     video_hash: str | None = None
     error: str | None = None
     report: ProcessingReport | None = None
