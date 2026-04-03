@@ -21,17 +21,18 @@ import {
 import AiVideoPanel from './components/AiVideoPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
+import type { AthleteRecord, StatsRecord, SubscriptionRecord } from './lib/api';
+import {
+  getActiveSubscriptions,
+  getAthlete,
+  getAthletes,
+  getStats,
+  getStatsForAthletes,
+  isSupabaseConfigured,
+} from './lib/api';
+import { subscribeToCheckout } from './lib/checkout';
 import Login from './pages/Login';
 import { useAuth } from './context/AuthContext';
-
-type TeamMember = {
-  id: number;
-  name: string;
-  role: string;
-  team: string;
-  location: string;
-  status: 'Available' | 'Busy' | 'Out';
-};
 
 type LiveSnapshot = {
   alerts: string[];
@@ -272,6 +273,7 @@ function averageScore(athletes: AthleteRecord[]) {
 }
 
 export default function App() {
+  const { isAuthenticated, logout } = useAuth();
   const [stage, setStage] = useState<AppStage>('landing');
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
   const [onboardingProfile, setOnboardingProfile] = useState<OnboardingProfile>(defaultOnboardingProfile);
@@ -302,6 +304,8 @@ export default function App() {
   const athleteSubscriptionActive = subscriptionState.has('athlete');
   const coachSubscriptionActive = subscriptionState.has('coach');
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
+  const activeScreenMeta = screens.find((screen) => screen.id === activeScreen) ?? screens[0];
+  const athleteDashboardAthlete = selectedAthlete;
 
   useEffect(() => {
     let cancelled = false;
@@ -470,7 +474,7 @@ export default function App() {
         setSubscriptionState(
           new Set([
             ...activeSubscriptions,
-            ...subscriptions.map((subscription) => subscription.plan_key.toLowerCase()),
+            ...subscriptions.map((subscription: SubscriptionRecord) => subscription.plan_key.toLowerCase()),
           ]),
         );
       } catch {
@@ -560,6 +564,23 @@ export default function App() {
   function openRecruiterProfile(athleteId: string) {
     setSelectedAthleteId(athleteId);
     setActiveScreen('profile');
+  }
+
+  async function handleAthletePrimaryAction() {
+    if (!athleteSubscriptionActive) {
+      const athletePlan = subscriptionPlans.find((plan) => plan.key === 'athlete');
+      if (athletePlan) {
+        await handleSubscribe(athletePlan);
+      }
+      return;
+    }
+
+    if (selectedAthlete?.highlight_url) {
+      window.open(selectedAthlete.highlight_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setCheckoutMessage('No highlight URL is available for this athlete yet.');
   }
 
   function handleOnboardingComplete(profile: OnboardingProfile) {
@@ -1499,6 +1520,8 @@ function LandingPage({
             </Panel>
           ))}
         </section>
+
+        <ProductPlatformPanel />
 
         <section className="grid gap-4 lg:grid-cols-3">
           {plans.map((plan) => (

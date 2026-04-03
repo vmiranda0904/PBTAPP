@@ -271,7 +271,7 @@ function normalizeJob(job: unknown, owner?: AiRequestOwner): AiJob {
     user_id: isString(job.user_id) ? job.user_id : undefined,
     team_id: isString(job.team_id) ? job.team_id : undefined,
     status: ['queued', 'processing', 'completed', 'failed'].includes(job.status) ? (job.status as AiJobStatus) : 'failed',
-    progress: clampJobProgress(job.progress),
+    progress: clampJobProgress(isNumber(job.progress) ? job.progress : null),
     processing_stage: isString(job.processing_stage) ? job.processing_stage : undefined,
     sport: job.sport,
     team_name: job.team_name,
