@@ -7,6 +7,8 @@ from supabase import Client, create_client
 
 from .config import SUPABASE_STORAGE_BUCKET, ensure_supabase_configured
 
+MAX_PUBLIC_URL_DEPTH = 5
+
 
 @lru_cache(maxsize=1)
 def get_supabase_client() -> Client:
@@ -31,7 +33,7 @@ def download_bytes(storage_path: str) -> bytes:
 
 
 def _extract_public_url(value: Any, depth: int = 0) -> str | None:
-    if depth > 5:
+    if depth > MAX_PUBLIC_URL_DEPTH:
         return None
 
     if isinstance(value, str):
