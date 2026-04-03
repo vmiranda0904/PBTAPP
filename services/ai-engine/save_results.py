@@ -5,6 +5,8 @@ from uuid import uuid4
 
 from supabase import Client, create_client
 
+SCORE_PER_SPIKE = 2
+
 
 def _create_supabase_client() -> Client:
     supabase_url = os.environ["SUPABASE_URL"]
@@ -40,6 +42,6 @@ def save_results(athlete_id: str, stats: dict[str, int], highlight_url: str) -> 
     supabase.table("athletes").update(
         {
             "highlight_url": highlight_url,
-            "score": payload["spikes"] * 2,
+            "score": payload["spikes"] * SCORE_PER_SPIKE,
         }
     ).eq("id", athlete_id).execute()

@@ -1742,14 +1742,14 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
 }
 
 function ScoreRing({ score }: { score: number }) {
+  const normalizedScore = Math.max(0, Math.min(score, 100));
+  const accentStop = Math.min(normalizedScore + SCORE_RING_ACCENT_SPAN, 100);
+
   return (
     <div
       className="flex h-32 w-32 items-center justify-center rounded-full"
       style={{
-        background: `conic-gradient(${SCORE_RING_PRIMARY} 0 ${score}%, ${SCORE_RING_SECONDARY} ${score}% ${Math.min(
-          score + SCORE_RING_ACCENT_SPAN,
-          100,
-        )}%, rgba(255,255,255,0.08) ${Math.min(score + SCORE_RING_ACCENT_SPAN, 100)}% 100%)`,
+        background: `conic-gradient(${SCORE_RING_PRIMARY} 0 ${normalizedScore}%, ${SCORE_RING_SECONDARY} ${normalizedScore}% ${accentStop}%, rgba(255,255,255,0.08) ${accentStop}% 100%)`,
       }}
     >
       <div className="flex h-[104px] w-[104px] items-center justify-center rounded-full border border-white/8 bg-slate-950 text-3xl font-semibold text-white">
