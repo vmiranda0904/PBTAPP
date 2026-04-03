@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/services/supabase';
 
 type UserWithRole = {
@@ -30,55 +30,59 @@ export function normalizeUserRole(value?: string | null): AppUserRole | null {
 }
 
 export function useUserRole(user: UserWithRole) {
-  const [role, setRole] = useState<AppUserRole | null>(() => normalizeUserRole(user?.role ?? user?.user_metadata?.role));
-  const [loading, setLoading] = useState(false);
+  const userId = user?.id ?? null;
+  const shouldFetchProfileRole = Boolean(user && supabase && user.authSource === 'supabase' && userId);
+  const fallbackRole = useMemo(() => normalizeUserRole(user?.role ?? user?.user_metadata?.role), [user?.role, user?.user_metadata?.role]);
+  const [profileState, setProfileState] = useState<{
+    userId: string | null;
+    role: AppUserRole | null;
+    loading: boolean;
+  }>({
+    userId: null,
+    role: null,
+    loading: false,
+  });
 
   useEffect(() => {
     let active = true;
-    const fallbackRole = normalizeUserRole(user?.role ?? user?.user_metadata?.role);
 
-    if (!user) {
-      setRole(null);
-      setLoading(false);
+    if (!user || !supabase || user.authSource !== 'supabase' || !userId) {
       return () => {
         active = false;
       };
     }
 
-    if (!supabase || user.authSource !== 'supabase' || !user.id) {
-      setRole(fallbackRole);
-      setLoading(false);
-      return () => {
-        active = false;
-      };
-    }
+    void (async () => {
+      setProfileState({ userId, role: null, loading: true });
 
-    setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
 
-    void supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active) {
-          return;
-        }
+      if (!active) {
+        return;
+      }
 
-        if (error) {
-          setRole(fallbackRole);
-          setLoading(false);
-          return;
-        }
+      if (error) {
+        console.error('Unable to load user role from profiles:', error);
+      }
 
-        setRole(normalizeUserRole(data?.role ?? user.user_metadata?.role ?? user.role));
-        setLoading(false);
+      setProfileState({
+        userId,
+        role: error ? null : normalizeUserRole(data?.role),
+        loading: false,
       });
+    })();
 
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user, userId]);
 
-  return { role, loading };
+  return {
+    role: profileState.userId === userId && profileState.role ? profileState.role : fallbackRole,
+    loading: shouldFetchProfileRole && (profileState.userId !== userId || profileState.loading),
+  };
 }

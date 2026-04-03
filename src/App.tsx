@@ -22,6 +22,7 @@ import AiVideoPanel from './components/AiVideoPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
 import { useAthletePrimaryAction } from '@/modules/athlete/useAthletePrimaryAction';
+import ProtectedRoute from '@/modules/auth/ProtectedRoute';
 import { useAuth } from '@/modules/auth/useAuth';
 import { useUserRole, type AppUserRole } from '@/modules/auth/useUserRole';
 import {
@@ -353,14 +354,16 @@ export default function App() {
   const coachSubscriptionActive = subscriptionState.has('coach');
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
   const allowedScreens = useMemo(() => getAllowedScreensForRole(userRole), [userRole]);
-  const availableScreens = useMemo(() => screens.filter((screen) => allowedScreens.includes(screen.id)), [allowedScreens]);
+  const roleFilteredScreens = useMemo(() => screens.filter((screen) => allowedScreens.includes(screen.id)), [allowedScreens]);
 
   useEffect(() => {
-    if (!authContext.isAuthenticated) {
-      return;
-    }
+    setStage((current) => {
+      if (authContext.isAuthenticated) {
+        return current === 'landing' ? 'dashboard' : current;
+      }
 
-    setStage('dashboard');
+      return current === 'dashboard' ? 'landing' : current;
+    });
   }, [authContext.isAuthenticated]);
 
   useEffect(() => {
@@ -641,6 +644,7 @@ export default function App() {
 
   function openRecruiterProfile(athleteId: string) {
     if (!allowedScreens.includes('profile')) {
+      console.warn('Blocked profile access for the current role.');
       return;
     }
 
@@ -692,205 +696,197 @@ export default function App() {
     return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
   }
 
-  if (!authContext.isAuthenticated) {
-    return <Login />;
-  }
-
-  if (loadingUserRole) {
-    return (
-      <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
-        <div className="mx-auto flex max-w-xl items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
-          Loading dashboard access...
-        </div>
-      </div>
-    );
-  }
-
-  if (!userRole) {
-    return (
-      <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
-        <div className="mx-auto max-w-xl rounded-3xl border border-rose-500/30 bg-rose-500/10 p-8 text-center">
-          <p className="text-sm uppercase tracking-[0.28em] text-rose-200">Access restricted</p>
-          <h1 className="mt-3 text-3xl font-semibold text-white">No dashboard is assigned to this account.</h1>
-          <p className="mt-3 text-sm text-slate-300">Ask an administrator to update your role before signing in again.</p>
-          <button
-            type="button"
-            onClick={authContext.logout}
-            className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-[#050816] text-slate-50">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(34,197,94,0.14),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.88),_rgba(2,6,23,1))]" />
-      <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/70 p-6 shadow-2xl shadow-black/30 backdrop-blur">
-          <div className="flex flex-col gap-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
-              PRIMEAthletix
-              <span className="text-xs tracking-[0.24em] text-emerald-300">Supabase • AI pipeline • subscriptions</span>
-            </div>
-
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-              <div className="max-w-3xl space-y-4">
-                <div className="space-y-3">
-                  <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                    Live athlete data, AI-generated highlights, and subscription-ready dashboards.
-                  </h1>
-                  <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
-                    This app now reads athletes and stat rows from Supabase, listens for live AI pipeline updates, and exposes Stripe-powered upgrade paths for premium workflows.
-                  </p>
-                  <div className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">
-                    {userRole} access
-                  </div>
+    <ProtectedRoute user={authContext.user} fallback={<Login />}>
+      {loadingUserRole ? (
+        <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
+          <div className="mx-auto flex max-w-xl items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+            Loading dashboard access...
+          </div>
+        </div>
+      ) : userRole === null ? (
+        <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
+          <div className="mx-auto max-w-xl rounded-3xl border border-rose-500/30 bg-rose-500/10 p-8 text-center">
+            <p className="text-sm uppercase tracking-[0.28em] text-rose-200">Access restricted</p>
+            <h1 className="mt-3 text-3xl font-semibold text-white">No dashboard is assigned to this account.</h1>
+            <p className="mt-3 text-sm text-slate-300">Ask an administrator to update your role before signing in again.</p>
+            <button
+              type="button"
+              onClick={authContext.logout}
+              className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="min-h-screen bg-[#050816] text-slate-50">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(34,197,94,0.14),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.88),_rgba(2,6,23,1))]" />
+          <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+            <header className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/70 p-6 shadow-2xl shadow-black/30 backdrop-blur">
+              <div className="flex flex-col gap-4">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
+                  PRIMEAthletix
+                  <span className="text-xs tracking-[0.24em] text-emerald-300">Supabase • AI pipeline • subscriptions</span>
                 </div>
 
-                <ul className="flex flex-wrap gap-2" aria-label="Connected product flow highlights">
-                  {['Real athletes', 'Real stats', 'AI highlights', 'Monetized access'].map((item) => (
-                    <li key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300">
-                      {item}
-                    </li>
+                <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+                  <div className="max-w-3xl space-y-4">
+                    <div className="space-y-3">
+                      <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+                        Live athlete data, AI-generated highlights, and subscription-ready dashboards.
+                      </h1>
+                      <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
+                        This app now reads athletes and stat rows from Supabase, listens for live AI pipeline updates, and exposes Stripe-powered upgrade paths for premium workflows.
+                      </p>
+                      <div className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">
+                        {userRole} access
+                      </div>
+                    </div>
+
+                    <ul className="flex flex-wrap gap-2" aria-label="Connected product flow highlights">
+                      {['Real athletes', 'Real stats', 'AI highlights', 'Monetized access'].map((item) => (
+                        <li key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[380px]">
+                    <StatCard label="Roster loaded" value={loadingRoster ? '...' : String(athletes.length)} detail="Supabase athlete rows" />
+                    <StatCard
+                      label="Live pipeline"
+                      value={liveSnapshot.status === 'connected' ? 'On' : liveSnapshot.status === 'disabled' ? 'Off' : '...'}
+                      detail="AI websocket health"
+                    />
+                    <StatCard
+                      label="Subscriptions"
+                      value={[athleteSubscriptionActive, coachSubscriptionActive, recruiterSubscriptionActive].filter(Boolean).length.toString()}
+                      detail="Unlocked premium roles"
+                    />
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {dataError ? (
+              <NoticeBanner icon={<Bell className="h-4 w-4" />} tone="rose" message={dataError} />
+            ) : null}
+
+            {checkoutMessage ? (
+              <NoticeBanner icon={<Bell className="h-4 w-4" />} tone="amber" message={checkoutMessage} />
+            ) : null}
+
+            <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+              <Panel>
+                <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">{getScreenMeta(activeScreen).eyebrow}</p>
+                <h2 className="mt-2 text-3xl font-semibold text-white">{getScreenMeta(activeScreen).label}</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-400">{getScreenMeta(activeScreen).summary}</p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {roleFilteredScreens.map((screen) => (
+                    <button
+                      key={screen.id}
+                      type="button"
+                      onClick={() => setActiveScreen(screen.id)}
+                      className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                        screen.id === activeScreen
+                          ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100'
+                          : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.08]'
+                      }`}
+                    >
+                      {screen.label}
+                    </button>
                   ))}
-                </ul>
-              </div>
+                </div>
+              </Panel>
 
-              <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[380px]">
-                <StatCard label="Roster loaded" value={loadingRoster ? '...' : String(athletes.length)} detail="Supabase athlete rows" />
-                <StatCard
-                  label="Live pipeline"
-                  value={liveSnapshot.status === 'connected' ? 'On' : liveSnapshot.status === 'disabled' ? 'Off' : '...'}
-                  detail="AI websocket health"
-                />
-                <StatCard
-                  label="Subscriptions"
-                  value={[athleteSubscriptionActive, coachSubscriptionActive, recruiterSubscriptionActive].filter(Boolean).length.toString()}
-                  detail="Unlocked premium roles"
-                />
-              </div>
+              <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={subscriptionState} onSubscribe={(plan) => void handleSubscribe(plan)} />
+            </section>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={authContext.logout}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+              >
+                Sign out
+              </button>
             </div>
+
+            <ErrorBoundary title="AI scouting unavailable" message="The AI scouting workspace failed to load safely.">
+              <AiVideoPanel />
+            </ErrorBoundary>
+
+            {activeScreen === 'athlete' ? (
+              <AthleteDashboard
+                athlete={selectedAthlete}
+                stats={selectedStats}
+                loading={loadingAthlete}
+                highlights={athleteHighlights}
+                latestStatSummary={latestStatSummary}
+                pipelineStatus={pipelineStatus}
+                subscriptionActive={athleteSubscriptionActive}
+                onPrimaryAction={onAthletePrimaryAction}
+                onOpenProfile={() => setActiveScreen('profile')}
+              />
+            ) : null}
+
+            {activeScreen === 'coach' ? (
+              <CoachDashboard
+                onEnterLiveMode={() => setActiveScreen('live')}
+                players={playerRows}
+                performance={averageTeamScore}
+                insights={aiInsights}
+                gamePlan={coachGamePlan}
+                subscriptionActive={coachSubscriptionActive}
+                onUnlock={() => {
+                  const coachPlan = subscriptionPlans.find((plan) => plan.key === 'coach');
+                  if (coachPlan) {
+                    void handleSubscribe(coachPlan);
+                  }
+                }}
+              />
+            ) : null}
+
+            {activeScreen === 'live' ? (
+              <LiveGameMode
+                liveSnapshot={liveSnapshot}
+                subscriptionActive={coachSubscriptionActive}
+                onUnlock={() => {
+                  const coachPlan = subscriptionPlans.find((plan) => plan.key === 'coach');
+                  if (coachPlan) {
+                    void handleSubscribe(coachPlan);
+                  }
+                }}
+              />
+            ) : null}
+
+            {activeScreen === 'recruiter' ? (
+              <RecruiterDashboard
+                athletes={athletes}
+                loading={loadingRoster}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onOpenProfile={openRecruiterProfile}
+                savedProspects={featuredProspects}
+                subscriptionActive={recruiterSubscriptionActive}
+                onUnlock={() => {
+                  const recruiterPlan = subscriptionPlans.find((plan) => plan.key === 'recruiter');
+                  if (recruiterPlan) {
+                    void handleSubscribe(recruiterPlan);
+                  }
+                }}
+              />
+            ) : null}
+
+            {activeScreen === 'profile' ? (
+              <AthleteProfile athlete={selectedAthlete} stats={selectedStats} loading={loadingAthlete} />
+            ) : null}
           </div>
-        </header>
-
-        {dataError ? (
-          <NoticeBanner icon={<Bell className="h-4 w-4" />} tone="rose" message={dataError} />
-        ) : null}
-
-        {checkoutMessage ? (
-          <NoticeBanner icon={<Bell className="h-4 w-4" />} tone="amber" message={checkoutMessage} />
-        ) : null}
-
-        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <Panel>
-            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">{getScreenMeta(activeScreen).eyebrow}</p>
-            <h2 className="mt-2 text-3xl font-semibold text-white">{getScreenMeta(activeScreen).label}</h2>
-            <p className="mt-2 max-w-2xl text-sm text-slate-400">{getScreenMeta(activeScreen).summary}</p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {availableScreens.map((screen) => (
-                <button
-                  key={screen.id}
-                  type="button"
-                  onClick={() => setActiveScreen(screen.id)}
-                  className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                    screen.id === activeScreen
-                      ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100'
-                      : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.08]'
-                  }`}
-                >
-                  {screen.label}
-                </button>
-              ))}
-            </div>
-          </Panel>
-
-          <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={subscriptionState} onSubscribe={(plan) => void handleSubscribe(plan)} />
-        </section>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={authContext.logout}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
-          >
-            Sign out
-          </button>
         </div>
-
-        <ErrorBoundary title="AI scouting unavailable" message="The AI scouting workspace failed to load safely.">
-          <AiVideoPanel />
-        </ErrorBoundary>
-
-        {activeScreen === 'athlete' ? (
-          <AthleteDashboard
-            athlete={selectedAthlete}
-            stats={selectedStats}
-            loading={loadingAthlete}
-            highlights={athleteHighlights}
-            latestStatSummary={latestStatSummary}
-            pipelineStatus={pipelineStatus}
-            subscriptionActive={athleteSubscriptionActive}
-            onPrimaryAction={onAthletePrimaryAction}
-            onOpenProfile={() => setActiveScreen('profile')}
-          />
-        ) : null}
-
-        {activeScreen === 'coach' ? (
-          <CoachDashboard
-            onEnterLiveMode={() => setActiveScreen('live')}
-            players={playerRows}
-            performance={averageTeamScore}
-            insights={aiInsights}
-            gamePlan={coachGamePlan}
-            subscriptionActive={coachSubscriptionActive}
-            onUnlock={() => {
-              const coachPlan = subscriptionPlans.find((plan) => plan.key === 'coach');
-              if (coachPlan) {
-                void handleSubscribe(coachPlan);
-              }
-            }}
-          />
-        ) : null}
-
-        {activeScreen === 'live' ? (
-          <LiveGameMode
-            liveSnapshot={liveSnapshot}
-            subscriptionActive={coachSubscriptionActive}
-            onUnlock={() => {
-              const coachPlan = subscriptionPlans.find((plan) => plan.key === 'coach');
-              if (coachPlan) {
-                void handleSubscribe(coachPlan);
-              }
-            }}
-          />
-        ) : null}
-
-        {activeScreen === 'recruiter' ? (
-          <RecruiterDashboard
-            athletes={athletes}
-            loading={loadingRoster}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onOpenProfile={openRecruiterProfile}
-            savedProspects={featuredProspects}
-            subscriptionActive={recruiterSubscriptionActive}
-            onUnlock={() => {
-              const recruiterPlan = subscriptionPlans.find((plan) => plan.key === 'recruiter');
-              if (recruiterPlan) {
-                void handleSubscribe(recruiterPlan);
-              }
-            }}
-          />
-        ) : null}
-
-        {activeScreen === 'profile' ? (
-          <AthleteProfile athlete={selectedAthlete} stats={selectedStats} loading={loadingAthlete} />
-        ) : null}
-      </div>
-    </div>
+      )}
+    </ProtectedRoute>
   );
 }
 
