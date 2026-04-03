@@ -1,14 +1,14 @@
-# Team Communications App
+# PBTAPP
 
-A simple React + Vite workspace for team communication, shared calendar planning, roster visibility, and lightweight management tracking.
+A premium React + Vite product concept for connected volleyball experiences across athletes, coaches, recruiters, and shareable athlete profiles.
 
-## Features
+## Screens
 
-- Team communication feed for announcements and channel updates
-- Team calendar for upcoming meetings and milestones
-- Roster board showing teammates, roles, locations, and availability
-- Management board for tracking open follow-up tasks
-- Quick add forms for updates, calendar events, and teammates
+- Athlete Dashboard focused on performance score, exposure, and highlight generation
+- Coach / Team Dashboard focused on opponent insights and game-planning decisions
+- Live Game Mode built for in-game readability with AI insights and live stats
+- Recruiter Dashboard built for fast athlete discovery and comparison
+- Athlete Profile designed as a shareable recruiting conversion page
 
 ## Run locally
 
