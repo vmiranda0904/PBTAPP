@@ -171,11 +171,11 @@ def _complete_from_cached_job(job: VideoJob, cached_job: VideoJob, video_hash: s
     if cached_report:
         cached_report.pdf_report_url = f'/jobs/{job.id}/report.pdf'
 
-    job.progress = 100
     job.video_hash = video_hash
     job.file_size_bytes = file_size
     job.report = cached_report
     job.status = 'completed'
+    job.progress = 100
     job.processing_stage = 'completed_from_cache'
     job.video_url = cached_job.video_url or job.video_url
     job.report_storage_path = cached_job.report_storage_path
@@ -385,7 +385,6 @@ def process_video_job(job_id: str) -> None:
             current_job.timings_ms.total_ms = round(current_job.timings_ms.total_ms, 2)
             if attempt < current_job.max_retries:
                 current_job.status = 'queued'
-                current_job.progress = max(current_job.progress, 15)
                 current_job.processing_stage = 'retry_scheduled'
                 save_job(current_job)
                 log_exception('job_processing_retry', job_id=job_id, attempt=attempt + 1, max_retries=current_job.max_retries)
