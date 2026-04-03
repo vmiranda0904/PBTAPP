@@ -338,9 +338,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const shouldAutoApprove = isTeamCreator || isAdminEmail;
-      const normalizedRole = shouldAutoApprove ? 'admin' : normalizeUserRole(fields.role) ?? 'athlete';
+      const requestedRole = normalizeUserRole(fields.role);
+      const normalizedRole = shouldAutoApprove ? 'admin' : requestedRole ?? 'athlete';
       const legacyRole = formatRoleLabel(normalizedRole);
       const settings = await getAppSettings();
+
+      if (!shouldAutoApprove && !requestedRole) {
+        console.warn(`Unknown signup role "${fields.role}" received; defaulting to athlete.`);
+      }
 
       if (supabase) {
         const displayName = fields.name.trim();

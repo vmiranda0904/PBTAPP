@@ -404,7 +404,9 @@ export default function App() {
       return;
     }
 
-    if (pathname === '/dashboard' || !requestedScreen || !allowedScreens.includes(requestedScreen)) {
+    const targetPath = getDashboardPath(defaultScreen);
+
+    if ((pathname === '/dashboard' || !requestedScreen || !allowedScreens.includes(requestedScreen)) && pathname !== targetPath) {
       navigate(getDashboardPath(defaultScreen), { replace: true });
     }
   }, [allowedScreens, authContext.isAuthenticated, defaultScreen, isDashboardPath, navigate, pathname, requestedScreen, userRole]);
@@ -480,8 +482,6 @@ export default function App() {
     let cancelled = false;
 
     async function loadAthlete() {
-      setSelectedAthlete(null);
-      setSelectedStats(null);
       setLoadingAthlete(true);
 
       try {
