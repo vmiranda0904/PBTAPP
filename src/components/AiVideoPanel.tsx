@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 
 const sportOptions = ['volleyball', 'soccer', 'basketball', 'football', 'baseball'];
 const MAX_POLL_ATTEMPTS = 30;
+const POLL_INTERVAL_MS = 2500;
 
 export default function AiVideoPanel() {
   const { isAuthenticated, user } = useAuth();
@@ -32,7 +33,8 @@ export default function AiVideoPanel() {
     }
 
     if (pollStateRef.current.attempts >= MAX_POLL_ATTEMPTS) {
-      const message = `AI processing timed out after ${MAX_POLL_ATTEMPTS} polling attempts (75 seconds).`;
+      const timeoutSeconds = (MAX_POLL_ATTEMPTS * POLL_INTERVAL_MS) / 1000;
+      const message = `AI processing timed out after ${MAX_POLL_ATTEMPTS} polling attempts (${timeoutSeconds} seconds).`;
       setError(message);
       setJob((currentJob) => (
         currentJob && currentJob.id === job.id
@@ -63,7 +65,7 @@ export default function AiVideoPanel() {
           ));
         }
       }
-    }, 2500);
+    }, POLL_INTERVAL_MS);
 
     return () => window.clearTimeout(timeoutId);
   }, [job, owner]);

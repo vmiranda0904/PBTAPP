@@ -57,7 +57,7 @@ def _read_video_payload(job: VideoJob) -> bytes:
         return download_bytes(job.storage_path)
     if job.video_url:
         return _download_video_bytes(job.video_url)
-    raise RuntimeError('Missing uploaded video reference for queued job.')
+    raise RuntimeError('Job is missing both storage_path and video_url; cannot retrieve video for processing.')
 
 
 def _biased_end_x(rng: random.Random, bias: str) -> float:
