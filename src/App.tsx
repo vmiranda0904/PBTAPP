@@ -667,7 +667,10 @@ export default function App() {
       return;
     }
 
+    setLoadingAthlete(true);
     setSelectedAthleteId(athleteId);
+    setSelectedAthlete(null);
+    setSelectedStats(null);
     navigate(getDashboardPath('profile'));
   }
 

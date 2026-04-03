@@ -333,6 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const shouldAutoApprove = isTeamCreator || isAdminEmail;
       const normalizedRole = shouldAutoApprove ? 'admin' : normalizeUserRole(fields.role) ?? 'athlete';
+      const legacyRole = formatRoleLabel(normalizedRole);
       const settings = await getAppSettings();
 
       if (supabase) {
@@ -378,7 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const newUser = await createRegistration(
-        { ...fields, teamId, role: shouldAutoApprove ? 'Admin' : fields.role },
+        { ...fields, teamId, role: legacyRole },
         shouldAutoApprove,
         settings.requireApproval,
       );
