@@ -32,7 +32,7 @@ export default function AiVideoPanel() {
     }
 
     if (pollStateRef.current.attempts >= MAX_POLL_ATTEMPTS) {
-      const message = 'AI processing timed out while waiting for the job to finish.';
+      const message = `AI processing timed out after ${MAX_POLL_ATTEMPTS} polling attempts (75 seconds).`;
       setError(message);
       setJob((currentJob) => (
         currentJob && currentJob.id === job.id

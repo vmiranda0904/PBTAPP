@@ -30,7 +30,13 @@ def download_bytes(storage_path: str) -> bytes:
     return get_supabase_client().storage.from_(SUPABASE_STORAGE_BUCKET).download(storage_path)
 
 
-def _extract_public_url(value: Any) -> str | None:
+def _extract_public_url(value: Any, visited: set[int] | None = None) -> str | None:
+    active_ids = visited or set()
+    value_id = id(value)
+    if value_id in active_ids:
+        return None
+    active_ids.add(value_id)
+
     if isinstance(value, str):
         candidate = value.strip()
         return candidate or None
@@ -40,15 +46,13 @@ def _extract_public_url(value: Any) -> str | None:
         if isinstance(candidate, str) and candidate.strip():
             return candidate.strip()
         data = value.get('data')
-        if data is not value:
-            return _extract_public_url(data)
+        if data is not None:
+            return _extract_public_url(data, active_ids)
 
     for attribute in ('publicURL', 'publicUrl', 'public_url', 'data'):
         if hasattr(value, attribute):
             candidate = getattr(value, attribute)
-            if candidate is value:
-                continue
-            extracted = _extract_public_url(candidate)
+            extracted = _extract_public_url(candidate, active_ids)
             if extracted:
                 return extracted
 
