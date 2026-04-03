@@ -1,26 +1,28 @@
 from __future__ import annotations
 
-from pathlib import Path
+from io import BytesIO
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 
-def generate_report(data: dict[str, object], filename: str) -> str:
-    output_path = Path(filename)
-    doc = SimpleDocTemplate(str(output_path), pagesize=letter)
+def generate_report(data: dict[str, object]) -> bytes:
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
     content: list[object] = []
     styles = getSampleStyleSheet()
     stats = data.get('stats', {})
     if not isinstance(stats, dict):
         stats = {}
     insights = data.get('insights') or []
+    if not isinstance(insights, list):
+        insights = []
 
     content.append(Paragraph('PRIME Athletix Scouting Report', styles['Title']))
     content.append(Spacer(1, 12))
-    content.append(Paragraph(f"Team: {data['team_name']}", styles['BodyText']))
-    content.append(Paragraph(f"Summary: {data['summary']}", styles['BodyText']))
+    content.append(Paragraph(f"Team: {data.get('team_name', 'Unknown team')}", styles['BodyText']))
+    content.append(Paragraph(f"Summary: {data.get('summary', 'No summary available')}", styles['BodyText']))
     content.append(Spacer(1, 12))
 
     for player, player_stats in stats.items():
@@ -32,4 +34,4 @@ def generate_report(data: dict[str, object], filename: str) -> str:
         content.append(Paragraph(f'- {insight}', styles['BodyText']))
 
     doc.build(content)
-    return str(output_path)
+    return buffer.getvalue()

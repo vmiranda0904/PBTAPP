@@ -1,39 +1,77 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import CoachDashboard from './CoachDashboard';
-import { createAiJob, fetchAiJob, isAiEngineConfigured } from '../lib/aiEngineService';
+import ErrorBoundary from './ErrorBoundary';
+import { createAiJob, fetchAiJob, isAiEngineConfigured, isRenderableAiReport } from '../lib/aiEngineService';
 import type { AiJob } from '../lib/aiEngineService';
+import { useAuth } from '../context/AuthContext';
 
 const sportOptions = ['volleyball', 'soccer', 'basketball', 'football', 'baseball'];
 
 export default function AiVideoPanel() {
+  const { isAuthenticated, user } = useAuth();
   const [selectedSport, setSelectedSport] = useState('volleyball');
   const [teamName, setTeamName] = useState('Riverview Opponents');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [job, setJob] = useState<AiJob | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const timedJobRef = useRef<string | null>(null);
+
+  const owner = useMemo(() => (user ? { userId: user.id, teamId: user.teamId } : null), [user]);
 
   useEffect(() => {
-    if (!job || (job.status !== 'queued' && job.status !== 'processing')) {
+    if (!job || !owner || (job.status !== 'queued' && job.status !== 'processing')) {
       return undefined;
     }
 
     const timeoutId = window.setTimeout(async () => {
       try {
-        setJob(await fetchAiJob(job.id));
+        const refreshedJob = await fetchAiJob(job.id, owner);
+        setJob(refreshedJob);
       } catch (pollError) {
+        console.error('AI polling error:', pollError);
         setError(pollError instanceof Error ? pollError.message : 'Unable to refresh AI engine status.');
       }
     }, 2500);
 
     return () => window.clearTimeout(timeoutId);
+  }, [job, owner]);
+
+  useEffect(() => {
+    if (!job) return;
+
+    if ((job.status === 'queued' || job.status === 'processing') && timedJobRef.current !== job.id) {
+      console.time(`AI job ${job.id}`);
+      timedJobRef.current = job.id;
+    }
+
+    if ((job.status === 'completed' || job.status === 'failed') && timedJobRef.current === job.id) {
+      console.timeEnd(`AI job ${job.id}`);
+      timedJobRef.current = null;
+    }
   }, [job]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (!isAuthenticated || !owner) {
+      setError('Sign in before using the AI scouting workflow.');
+      return;
+    }
+
     if (!selectedFile) {
       setError('Choose a video file before starting analysis.');
+      return;
+    }
+
+    if (!selectedFile.type.startsWith('video/')) {
+      setError('Upload a supported video file.');
+      return;
+    }
+
+    if (!teamName.trim()) {
+      setError('Enter an opponent team name.');
       return;
     }
 
@@ -41,9 +79,13 @@ export default function AiVideoPanel() {
     setError('');
 
     try {
-      const queuedJob = await createAiJob(selectedFile, selectedSport, teamName.trim() || 'Opponent team');
+      console.time('AI upload');
+      const queuedJob = await createAiJob(selectedFile, selectedSport, teamName.trim() || 'Opponent team', owner);
+      console.timeEnd('AI upload');
       setJob(queuedJob);
     } catch (submitError) {
+      console.error('AI submission error:', submitError);
+      console.timeEnd('AI upload');
       setError(submitError instanceof Error ? submitError.message : 'Unable to start AI processing.');
     } finally {
       setIsSubmitting(false);
@@ -62,7 +104,7 @@ export default function AiVideoPanel() {
           </p>
         </div>
         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-          Goal: AI-assisted coaching intelligence on top of the fast video-analysis pipeline.
+          Goal: AI-assisted coaching intelligence on top of the durable video job pipeline.
         </div>
       </div>
 
@@ -112,6 +154,12 @@ export default function AiVideoPanel() {
             </ul>
           </div>
 
+          {!isAuthenticated ? (
+            <p className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-3 text-sm text-amber-100">
+              Sign in to protect the scouting dashboard and create AI jobs.
+            </p>
+          ) : null}
+
           {!isAiEngineConfigured() ? (
             <p className="rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 text-sm text-rose-100">
               Configure VITE_AI_ENGINE_URL before using the scouting upload flow.
@@ -121,7 +169,7 @@ export default function AiVideoPanel() {
           {error ? <p className="text-sm text-rose-200">{error}</p> : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <MetricCard label="Tendency engine" value="Per player" detail="Left / middle / right attack split" />
+            <MetricCard label="Queue-backed" value="Durable" detail="Jobs survive service restarts" />
             <MetricCard label="Weakness scan" value="Error-based" detail="Pressure and zone flags" />
             <MetricCard label="Coach mode" value="Live-ready" detail="Prepared for future WebSocket updates" />
           </div>
@@ -129,7 +177,7 @@ export default function AiVideoPanel() {
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={isSubmitting || !isAiEngineConfigured()}
+              disabled={isSubmitting || !isAiEngineConfigured() || !isAuthenticated}
               className="rounded-xl bg-sky-400 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
             >
               {isSubmitting ? 'Queueing…' : 'Generate scouting report'}
@@ -159,9 +207,11 @@ export default function AiVideoPanel() {
 
               <dl className="mt-4 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
                 <InfoRow label="Sport" value={job.sport} />
-                <InfoRow label="Team" value={job.team_name} />
+                <InfoRow label="Stage" value={job.processing_stage ?? 'Pending'} />
                 <InfoRow label="Video hash" value={job.video_hash ?? 'Pending'} />
                 <InfoRow label="Total time" value={formatTiming(job.timings_ms.total_ms)} />
+                <InfoRow label="Retries" value={`${job.retry_count ?? 0} / ${job.max_retries ?? 0}`} />
+                <InfoRow label="Payload size" value={job.file_size_bytes ? formatBytes(job.file_size_bytes) : 'Pending'} />
               </dl>
 
               {job.report ? (
@@ -233,9 +283,11 @@ export default function AiVideoPanel() {
         </div>
       </div>
 
-      {job?.report ? (
+      {isRenderableAiReport(job?.report) ? (
         <div className="mt-5">
-          <CoachDashboard report={job.report} />
+          <ErrorBoundary title="Coach dashboard unavailable" message="The scouting report could not be rendered safely.">
+            <CoachDashboard report={job.report} />
+          </ErrorBoundary>
         </div>
       ) : null}
     </section>
@@ -279,4 +331,9 @@ function formatTiming(value?: number) {
   if (!value || Number.isNaN(value)) return 'Pending';
   if (value < 1000) return `${Math.round(value)} ms`;
   return `${(value / 1000).toFixed(2)} s`;
+}
+
+function formatBytes(value: number) {
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }

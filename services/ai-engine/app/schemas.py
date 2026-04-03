@@ -121,14 +121,28 @@ class ProcessingReport(BaseModel):
 
 class VideoJob(BaseModel):
     id: str
+    user_id: str
+    team_id: str
     status: JobStatus
+    processing_stage: str = 'accepted'
     sport: str
     team_name: str = 'Opponent team'
     file_name: str
+    content_type: str = 'application/octet-stream'
+    file_size_bytes: int = 0
+    storage_path: str | None = None
+    video_url: str | None = None
+    report_storage_path: str | None = None
+    pdf_storage_path: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    last_error_at: datetime | None = None
     video_hash: str | None = None
     error: str | None = None
+    retry_count: int = 0
+    max_retries: int = 0
     report: ProcessingReport | None = None
     timings_ms: StageTimings = Field(default_factory=StageTimings)
     result_url: str | None = None
@@ -146,3 +160,4 @@ class HealthResponse(BaseModel):
     device: str
     model: str
     pipeline_defaults: dict[str, int | float | str]
+    storage: Literal['supabase', 'unconfigured']

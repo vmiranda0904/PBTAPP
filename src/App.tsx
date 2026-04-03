@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import AiVideoPanel from './components/AiVideoPanel';
+import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
+import Login from './pages/Login';
+import { useAuth } from './context/AuthContext';
 
 type TeamMember = {
   id: number;
@@ -153,6 +156,7 @@ const statusStyles: Record<TeamMember['status'], string> = {
 };
 
 export default function App() {
+  const { isAuthenticated, logout, user } = useAuth();
   const [messages, setMessages] = useState(initialMessages);
   const [events, setEvents] = useState(initialEvents);
   const [members, setMembers] = useState(initialMembers);
@@ -255,6 +259,10 @@ export default function App() {
     );
   };
 
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -272,14 +280,26 @@ export default function App() {
             <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[360px]">
               <StatCard label="Pinned updates" value={stats.pinnedCount} detail="Shared with the full team" />
               <StatCard label="Available today" value={stats.availableCount} detail="Ready to take work" />
-              <StatCard label="Open manager tasks" value={stats.openTasks} detail="Pending follow-up" />
+              <StatCard label="Open manager tasks" value={stats.openTasks} detail={`Signed in as ${user?.name ?? 'Team user'}`} />
             </div>
           </div>
         </header>
 
         <ProductPlatformPanel />
 
-        <AiVideoPanel />
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+          >
+            Sign out
+          </button>
+        </div>
+
+        <ErrorBoundary title="AI scouting unavailable" message="The AI scouting workspace failed to load safely.">
+          <AiVideoPanel />
+        </ErrorBoundary>
 
         <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
           <Panel title="Team communications" subtitle="Post announcements, project notes, and channel updates.">
