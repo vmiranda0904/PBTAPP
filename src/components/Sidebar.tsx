@@ -15,7 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/modules/auth/useAuth';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 
 const NAV_ITEMS = [

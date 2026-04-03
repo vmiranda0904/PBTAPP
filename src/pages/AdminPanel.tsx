@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/modules/auth/useAuth';
 import { useApp } from '../context/AppContext';
 import type { Player, Placement } from '../context/AppContext';
 import { getPendingUsersByTeam, type RegisteredUser } from '../lib/userService';

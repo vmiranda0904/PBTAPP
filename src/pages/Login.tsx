@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/modules/auth/useAuth';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 import { LogIn, UserPlus, Eye, EyeOff, CheckCircle, Download, X, Copy, Check } from 'lucide-react';
 

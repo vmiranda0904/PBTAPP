@@ -21,6 +21,8 @@ import {
 import AiVideoPanel from './components/AiVideoPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
+import { useAthletePrimaryAction } from '@/modules/athlete/useAthletePrimaryAction';
+import { useAuth } from '@/modules/auth/useAuth';
 import {
   getActiveSubscriptions,
   getAthlete,
@@ -32,7 +34,6 @@ import {
 } from '@/services/api';
 import type { AthleteRecord, StatsRecord } from '@/types';
 import Login from './pages/Login';
-import { useAuth } from './context/AuthContext';
 
 type LiveSnapshot = {
   alerts: string[];
@@ -272,8 +273,12 @@ function averageScore(athletes: AthleteRecord[]) {
   return Math.round(scores.reduce((total, score) => total + score, 0) / scores.length);
 }
 
+function getScreenMeta(screenId: ScreenKey) {
+  return screens.find((screen) => screen.id === screenId) ?? screens[0];
+}
+
 export default function App() {
-  const { isAuthenticated, logout } = useAuth();
+  const authContext = useAuth();
   const [stage, setStage] = useState<AppStage>('landing');
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
   const [onboardingProfile, setOnboardingProfile] = useState<OnboardingProfile>(defaultOnboardingProfile);
@@ -304,7 +309,6 @@ export default function App() {
   const athleteSubscriptionActive = subscriptionState.has('athlete');
   const coachSubscriptionActive = subscriptionState.has('coach');
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
-  const activeScreenMeta = screens.find((screen) => screen.id === activeScreen) ?? screens[0];
 
   useEffect(() => {
     let cancelled = false;
@@ -565,22 +569,19 @@ export default function App() {
     setActiveScreen('profile');
   }
 
-  async function handleAthletePrimaryAction() {
-    if (!athleteSubscriptionActive) {
+  const onAthletePrimaryAction = useAthletePrimaryAction({
+    subscriptionActive: athleteSubscriptionActive,
+    highlightUrl: selectedAthlete?.highlight_url,
+    onSubscribe: () => {
       const athletePlan = subscriptionPlans.find((plan) => plan.key === 'athlete');
       if (athletePlan) {
-        await handleSubscribe(athletePlan);
+        void handleSubscribe(athletePlan);
       }
-      return;
-    }
-
-    if (selectedAthlete?.highlight_url) {
-      window.open(selectedAthlete.highlight_url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    setCheckoutMessage('The highlight video is still being processed in the AI pipeline. Check the AI video panel for job status.');
-  }
+    },
+    onProcessingPending: () => {
+      setCheckoutMessage('The highlight video is still being processed in the AI pipeline. Check the AI video panel for job status.');
+    },
+  });
 
   function handleOnboardingComplete(profile: OnboardingProfile) {
     setOnboardingProfile(profile);
@@ -612,7 +613,7 @@ export default function App() {
     return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
   }
 
-  if (!isAuthenticated) {
+  if (!authContext.isAuthenticated) {
     return <Login />;
   }
 
@@ -674,9 +675,9 @@ export default function App() {
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <Panel>
-            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">{activeScreenMeta.eyebrow}</p>
-            <h2 className="mt-2 text-3xl font-semibold text-white">{activeScreenMeta.label}</h2>
-            <p className="mt-2 max-w-2xl text-sm text-slate-400">{activeScreenMeta.summary}</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">{getScreenMeta(activeScreen).eyebrow}</p>
+            <h2 className="mt-2 text-3xl font-semibold text-white">{getScreenMeta(activeScreen).label}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-slate-400">{getScreenMeta(activeScreen).summary}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               {screens.map((screen) => (
                 <button
@@ -701,7 +702,7 @@ export default function App() {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={logout}
+            onClick={authContext.logout}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
           >
             Sign out
@@ -721,7 +722,7 @@ export default function App() {
             latestStatSummary={latestStatSummary}
             pipelineStatus={pipelineStatus}
             subscriptionActive={athleteSubscriptionActive}
-            onPrimaryAction={handleAthletePrimaryAction}
+            onPrimaryAction={onAthletePrimaryAction}
             onOpenProfile={() => setActiveScreen('profile')}
           />
         ) : null}
