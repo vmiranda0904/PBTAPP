@@ -8,7 +8,7 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .config import PIPELINE_DEFAULTS, pipeline_defaults_dict, detect_device
+from .config import PIPELINE_DEFAULTS, REPORTS_DIR, pipeline_defaults_dict, detect_device
 from .job_store import get_job, save_job
 from .pipeline import process_video_job
 from .schemas import CreateJobResponse, HealthResponse, VideoJob
@@ -89,7 +89,9 @@ def download_job_report(job_id: str) -> FileResponse:
     if not job or not job.report:
         raise HTTPException(status_code=404, detail='Report not ready.')
 
-    report_path = Path(__file__).resolve().parent.parent / 'data' / 'reports' / f'{job_id}.json'
+    report_path = (REPORTS_DIR / f'{job.id}.json').resolve()
+    if report_path.parent != REPORTS_DIR.resolve():
+        raise HTTPException(status_code=400, detail='Invalid report path.')
     if not report_path.exists():
         raise HTTPException(status_code=404, detail='Report file not found.')
-    return FileResponse(report_path, media_type='application/json', filename=f'{job_id}-report.json')
+    return FileResponse(report_path, media_type='application/json', filename=f'{job.id}-report.json')
