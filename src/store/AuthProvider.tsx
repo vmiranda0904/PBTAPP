@@ -201,11 +201,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         teamId = team.id;
         teamAdminEmail = team.adminEmail;
       } else {
-        const teamName = fields.teamName?.trim();
-        if (!teamName) {
+        const trimmedTeamName = fields.teamName?.trim();
+        if (!trimmedTeamName) {
           return { success: false, message: 'Please enter a team name to create a new team.' };
         }
-        const team = await createTeam(teamName, fields.email);
+        const team = await createTeam(trimmedTeamName, fields.email);
         teamId = team.id;
         isTeamCreator = true;
         returnedTeamCode = team.teamCode;
