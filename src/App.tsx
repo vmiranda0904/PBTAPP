@@ -69,10 +69,10 @@ const screens: Screen[] = [
 ];
 
 const athleteCards: AthleteCard[] = [
-  { name: 'Maya Brooks', position: 'OH', score: 94, gradYear: '2027', height: '6’0”', ranking: '#8 West' },
-  { name: 'Avery Nguyen', position: 'S', score: 91, gradYear: '2026', height: '5’10”', ranking: '#2 Setter' },
-  { name: 'Jordan Ellis', position: 'MB', score: 89, gradYear: '2028', height: '6’2”', ranking: '#11 National' },
-  { name: 'Sydney Flores', position: 'RS', score: 87, gradYear: '2027', height: '6’1”', ranking: '#5 Region' },
+  { name: 'Maya Brooks', position: 'OH', score: 94, gradYear: '2027', height: '6′0″', ranking: '#8 West' },
+  { name: 'Avery Nguyen', position: 'S', score: 91, gradYear: '2026', height: '5′10″', ranking: '#2 Setter' },
+  { name: 'Jordan Ellis', position: 'MB', score: 89, gradYear: '2028', height: '6′2″', ranking: '#11 National' },
+  { name: 'Sydney Flores', position: 'RS', score: 87, gradYear: '2027', height: '6′1″', ranking: '#5 Region' },
 ];
 
 const athleteFeed = {
@@ -102,11 +102,26 @@ const coachPlayers = [
 const recruiterSaved = ['Maya Brooks · OH · 2027', 'Jordan Ellis · MB · 2028', 'Avery Nguyen · S · 2026'];
 
 const profileBreakdown = [
-  { label: 'Vertical', value: '10’2”' },
-  { label: 'Approach touch', value: '10’5”' },
+  { label: 'Vertical', value: '10′2″' },
+  { label: 'Approach touch', value: '10′5″' },
   { label: 'Serve velocity', value: '49 mph' },
   { label: 'Passing rating', value: '2.34' },
 ];
+
+const SCORE_RING_PRIMARY = '#22d3ee';
+const SCORE_RING_SECONDARY = '#22c55e';
+const SCORE_RING_ACCENT_SPAN = 4;
+const MIN_TREND_BAR_HEIGHT = 18;
+const TREND_POINTS = [38, 54, 48, 70, 64, 79, 94];
+const ATHLETE_NAME = 'Maya Brooks';
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('');
+}
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
@@ -120,7 +135,7 @@ export default function App() {
             <div className="max-w-3xl space-y-4">
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
                 PBTAPP
-                <span className="text-[10px] tracking-[0.24em] text-emerald-300">Performance • Exposure • Decisions</span>
+                <span className="text-xs tracking-[0.24em] text-emerald-300">Performance • Exposure • Decisions</span>
               </div>
               <div className="space-y-3">
                 <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
@@ -131,16 +146,16 @@ export default function App() {
                   then converts with a shareable athlete profile.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <ul className="flex flex-wrap gap-2" aria-label="Connected product flow highlights">
                 {['Athlete generates highlights', 'Coach wins with insight', 'Recruiter finds talent', 'Profile converts opportunity'].map((item) => (
-                  <span
+                  <li
                     key={item}
                     className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300"
                   >
                     {item}
-                  </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[380px]">
               <StatCard label="Primary flows" value="4" detail="Athlete, coach, recruiter, profile" />
@@ -191,20 +206,32 @@ function AthleteDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
         <Panel>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex gap-4">
-              <ProfileOrb initials="MB" accent="from-cyan-400 to-emerald-400" />
+              <ProfileOrb initials={getInitials(ATHLETE_NAME)} accent="from-cyan-400 to-emerald-400" />
               <div className="space-y-3">
                 <div>
                   <p className="text-sm uppercase tracking-[0.3em] text-cyan-200">Athlete Dashboard</p>
-                  <h2 className="mt-2 text-3xl font-semibold text-white">Maya Brooks</h2>
+                  <h2 className="mt-2 text-3xl font-semibold text-white">{ATHLETE_NAME}</h2>
                   <p className="mt-1 text-sm text-slate-400">Outside Hitter · Class of 2027 · Wave VC</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {['Open to recruiting', 'Top 10 regional score', 'Last updated 2h ago'].map((item) => (
-                    <span key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
-                      {item}
-                    </span>
-                  ))}
-                </div>
+                <ul className="flex flex-wrap gap-2" aria-label="Athlete status highlights">
+                  <li
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300"
+                    aria-label="Recruiting status: open to recruiting"
+                  >
+                    Open to recruiting
+                  </li>
+                  <li
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300"
+                    aria-label="Ranking status: top 10 regional score"
+                  >
+                    Top 10 regional score
+                  </li>
+                  <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                    <time dateTime="2026-04-03T14:51:30Z" aria-label="Last updated 2 hours ago">
+                      Updated 2h ago
+                    </time>
+                  </li>
+                </ul>
               </div>
             </div>
             <button
@@ -484,7 +511,11 @@ function RecruiterDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <ProfileOrb initials={athlete.name.split(' ').map((part) => part[0]).join('')} accent="from-emerald-400 to-cyan-400" small />
+                  <ProfileOrb
+                    initials={getInitials(athlete.name)}
+                    accent="from-emerald-400 to-cyan-400"
+                    small
+                  />
                   <div>
                     <h3 className="text-lg font-semibold text-white">{athlete.name}</h3>
                     <p className="text-sm text-slate-400">{athlete.position} · {athlete.gradYear}</p>
@@ -538,11 +569,11 @@ function AthleteProfile() {
         <Panel>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex gap-4">
-              <ProfileOrb initials="MB" accent="from-cyan-400 via-blue-400 to-emerald-400" />
+              <ProfileOrb initials={getInitials(ATHLETE_NAME)} accent="from-cyan-400 via-blue-400 to-emerald-400" />
               <div>
                 <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Shareable Athlete Profile</p>
-                <h2 className="mt-2 text-3xl font-semibold text-white">Maya Brooks</h2>
-                <p className="mt-2 text-sm text-slate-400">OH · 2027 · 6’0” · Wave VC · GPA 3.9 · NCAA ready measurables</p>
+                <h2 className="mt-2 text-3xl font-semibold text-white">{ATHLETE_NAME}</h2>
+                <p className="mt-2 text-sm text-slate-400">OH · 2027 · 6′0″ · Wave VC · GPA 3.9 · NCAA ready measurables</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {['Verified testing', 'Recruiting ID 38194', 'Open evaluation window'].map((item) => (
                     <span key={item} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-slate-300">
@@ -638,7 +669,10 @@ function ScoreRing({ score }: { score: number }) {
     <div
       className="flex h-32 w-32 items-center justify-center rounded-full"
       style={{
-        background: `conic-gradient(#22d3ee 0 ${score}%, #22c55e ${score}% ${Math.min(score + 4, 100)}%, rgba(255,255,255,0.08) ${Math.min(score + 4, 100)}% 100%)`,
+        background: `conic-gradient(${SCORE_RING_PRIMARY} 0 ${score}%, ${SCORE_RING_SECONDARY} ${score}% ${Math.min(
+          score + SCORE_RING_ACCENT_SPAN,
+          100,
+        )}%, rgba(255,255,255,0.08) ${Math.min(score + SCORE_RING_ACCENT_SPAN, 100)}% 100%)`,
       }}
     >
       <div className="flex h-[104px] w-[104px] items-center justify-center rounded-full border border-white/8 bg-slate-950 text-3xl font-semibold text-white">
@@ -793,13 +827,13 @@ function MiniTrendChart({ tall = false }: { tall?: boolean }) {
   return (
     <div className={`rounded-[24px] border border-white/10 bg-white/[0.03] p-4 ${tall ? 'h-[220px]' : ''}`}>
       <div className="flex h-full items-end gap-3">
-        {[38, 54, 48, 70, 64, 79, 94].map((value, index) => (
-          <div key={`${value}-${index}`} className="flex flex-1 flex-col items-center gap-2">
+        {TREND_POINTS.map((value, index) => (
+          <div key={`trend-${index + 1}-${value}`} className="flex flex-1 flex-col items-center gap-2">
             <div
               className="w-full rounded-full bg-gradient-to-t from-cyan-400 via-blue-500 to-emerald-400"
-              style={{ height: `${Math.max(value, 18)}%` }}
+              style={{ height: `${Math.max(value, MIN_TREND_BAR_HEIGHT)}%` }}
             />
-            <span className="text-[11px] text-slate-500">W{index + 1}</span>
+            <span className="text-xs text-slate-500">W{index + 1}</span>
           </div>
         ))}
       </div>
