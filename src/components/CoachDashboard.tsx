@@ -5,7 +5,7 @@ import type { AiProcessingReport } from '../lib/aiEngineService';
 export default function CoachDashboard({ report }: { report: AiProcessingReport }) {
   const profile = report.opponent_profile;
 
-  if (!profile) {
+  if (!profile || !profile.team_name || !Array.isArray(profile.tendencies)) {
     return null;
   }
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import urlparse
 from dataclasses import asdict, dataclass
-from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -18,14 +18,38 @@ class PipelineDefaults:
     motion_threshold: float = 0.35
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = Path(os.environ.get('AI_ENGINE_DATA_DIR', BASE_DIR / 'data')).resolve()
-UPLOADS_DIR = DATA_DIR / 'uploads'
-CACHE_DIR = DATA_DIR / 'cache'
-REPORTS_DIR = DATA_DIR / 'reports'
+PIPELINE_DEFAULTS = PipelineDefaults()
+DEFAULT_SPORT = os.environ.get('AI_ENGINE_DEFAULT_SPORT', 'volleyball')
+AI_ENGINE_PORT = int(os.environ.get('AI_ENGINE_PORT', '8000'))
+AI_ENGINE_LOG_LEVEL = os.environ.get('AI_ENGINE_LOG_LEVEL', 'INFO').upper()
+AI_ENGINE_MAX_UPLOAD_BYTES = int(os.environ.get('AI_ENGINE_MAX_UPLOAD_BYTES', str(1024 * 1024 * 512)))
+AI_ENGINE_MAX_RETRIES = int(os.environ.get('AI_ENGINE_MAX_RETRIES', '2'))
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
+SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'videos').strip() or 'videos'
+SUPABASE_PROJECT_HOST = urlparse(SUPABASE_URL).netloc if SUPABASE_URL else ''
 
-for directory in (UPLOADS_DIR, CACHE_DIR, REPORTS_DIR):
-    directory.mkdir(parents=True, exist_ok=True)
+
+class ConfigurationError(RuntimeError):
+    pass
+
+
+REQUIRED_SUPABASE_ENV_VARS = {
+    'SUPABASE_URL': SUPABASE_URL,
+    'SUPABASE_SERVICE_ROLE_KEY': SUPABASE_SERVICE_ROLE_KEY,
+    'SUPABASE_STORAGE_BUCKET': SUPABASE_STORAGE_BUCKET,
+}
+
+
+def ensure_supabase_configured() -> None:
+    missing = [name for name, value in REQUIRED_SUPABASE_ENV_VARS.items() if not value]
+    if missing:
+        joined = ', '.join(missing)
+        raise ConfigurationError(f'Missing required Supabase configuration: {joined}.')
+
+
+def is_supabase_configured() -> bool:
+    return bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and SUPABASE_STORAGE_BUCKET)
 
 
 def detect_device() -> str:
@@ -35,11 +59,6 @@ def detect_device() -> str:
         return 'cuda' if torch.cuda.is_available() else 'cpu'
     except Exception:
         return 'cpu'
-
-
-PIPELINE_DEFAULTS = PipelineDefaults()
-DEFAULT_SPORT = os.environ.get('AI_ENGINE_DEFAULT_SPORT', 'volleyball')
-AI_ENGINE_PORT = int(os.environ.get('AI_ENGINE_PORT', '8000'))
 
 
 def pipeline_defaults_dict() -> dict[str, int | float | str]:

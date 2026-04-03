@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import AiVideoPanel from './components/AiVideoPanel';
+import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
+import Login from './pages/Login';
+import { useAuth } from './context/AuthContext';
 
 type TeamMember = {
   id: number;
@@ -548,6 +551,10 @@ export default function App() {
     return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
   }
 
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
   return (
     <div className="min-h-screen bg-[#050816] text-slate-50">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(34,197,94,0.14),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.88),_rgba(2,6,23,1))]" />
@@ -594,7 +601,19 @@ export default function App() {
 
         <ProductPlatformPanel />
 
-        <AiVideoPanel />
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+          >
+            Sign out
+          </button>
+        </div>
+
+        <ErrorBoundary title="AI scouting unavailable" message="The AI scouting workspace failed to load safely.">
+          <AiVideoPanel />
+        </ErrorBoundary>
 
         <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
           <Panel title="Team communications" subtitle="Post announcements, project notes, and channel updates.">

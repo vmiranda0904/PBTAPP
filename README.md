@@ -167,6 +167,8 @@ uvicorn app.main:app --reload
 
 Set `VITE_AI_ENGINE_URL=http://localhost:8000` in the frontend `.env` file to enable the upload and polling UI.
 
+Set the AI engine `.env` from `services/ai-engine/.env.example`, apply `/home/runner/work/PBTAPP/PBTAPP/supabase/schema.sql` to Supabase, and create the public `videos` storage bucket before starting the backend.
+
 ## Coach scouting AI
 
 The AI engine now layers coach-facing scouting intelligence on top of the video job flow.
