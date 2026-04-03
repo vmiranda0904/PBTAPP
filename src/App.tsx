@@ -21,7 +21,6 @@ import {
 import AiVideoPanel from './components/AiVideoPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
-import type { AthleteRecord, StatsRecord, SubscriptionRecord } from './lib/api';
 import {
   getActiveSubscriptions,
   getAthlete,
@@ -29,8 +28,9 @@ import {
   getStats,
   getStatsForAthletes,
   isSupabaseConfigured,
-} from './lib/api';
-import { subscribeToCheckout } from './lib/checkout';
+  subscribeToCheckout,
+} from '@/services/api';
+import type { AthleteRecord, StatsRecord } from '@/types';
 import Login from './pages/Login';
 import { useAuth } from './context/AuthContext';
 
@@ -328,7 +328,7 @@ export default function App() {
         }
 
         const roster = await getAthletes(searchQuery);
-        const stats = await getStatsForAthletes(roster.map((athlete) => athlete.id));
+        const stats = await getStatsForAthletes(roster);
 
         if (cancelled) return;
 
@@ -473,7 +473,7 @@ export default function App() {
         setSubscriptionState(
           new Set([
             ...activeSubscriptions,
-            ...subscriptions.map((subscription: SubscriptionRecord) => subscription.plan_key.toLowerCase()),
+            ...subscriptions.map((subscription) => subscription.plan_key.toLowerCase()),
           ]),
         );
       } catch {
