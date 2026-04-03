@@ -27,7 +27,7 @@ npm run build
 
 ## AI engine skeleton
 
-The repository now includes a backend service skeleton at `/home/runner/work/PBTAPP/PBTAPP/services/ai-engine` for sports performance and video-analysis workloads.
+The repository now includes a backend service skeleton at `services/ai-engine` for sports performance and video-analysis workloads.
 
 ### API contract
 
