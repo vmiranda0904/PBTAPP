@@ -1,43 +1,14 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import {
-  Activity,
-  AlertCircle,
-  ArrowRight,
-  BarChart3,
-  Bell,
-  CheckCircle2,
-  Gauge,
-  Lock,
-  Mic,
-  Play,
-  Search,
-  Share2,
-  Shield,
-  Target,
-  TrendingUp,
-  Trophy,
-  Users,
-  Video,
-} from 'lucide-react';
-import {
-  getAthlete,
-  getAthletes,
-  getActiveSubscriptions,
-  getStats,
-  getStatsForAthletes,
-  isSupabaseConfigured,
-  type AthleteRecord,
-  type StatsRecord,
-} from './lib/api';
-import { subscribeToCheckout } from './lib/checkout';
+import { useMemo, useState } from 'react';
+import AiVideoPanel from './components/AiVideoPanel';
+import ProductPlatformPanel from './components/ProductPlatformPanel';
 
-type ScreenKey = 'athlete' | 'coach' | 'live' | 'recruiter' | 'profile';
-
-type Screen = {
-  id: ScreenKey;
-  label: string;
-  eyebrow: string;
-  summary: string;
+type TeamMember = {
+  id: number;
+  name: string;
+  role: string;
+  team: string;
+  location: string;
+  status: 'Available' | 'Busy' | 'Out';
 };
 
 type LiveSnapshot = {
@@ -621,150 +592,45 @@ export default function App() {
           </div>
         </header>
 
-        {!supabaseReady ? (
-          <NoticeBanner
-            icon={<AlertCircle className="h-4 w-4" />}
-            tone="amber"
-            message="Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to load live athletes and stats."
-          />
-        ) : null}
+        <ProductPlatformPanel />
 
-        {dataError ? <NoticeBanner icon={<AlertCircle className="h-4 w-4" />} tone="rose" message={dataError} /> : null}
-        {checkoutMessage ? <NoticeBanner icon={<AlertCircle className="h-4 w-4" />} tone="rose" message={checkoutMessage} /> : null}
+        <AiVideoPanel />
 
-        <section className="rounded-[28px] border border-white/10 bg-slate-950/70 p-3 shadow-2xl shadow-black/20 backdrop-blur">
-          <div className="grid gap-3 lg:grid-cols-5">
-            {screens.map((screen) => {
-              const isActive = screen.id === activeScreen;
-              return (
-                <button
-                  key={screen.id}
-                  type="button"
-                  onClick={() => setActiveScreen(screen.id)}
-                  className={`rounded-[24px] border px-4 py-4 text-left transition ${
-                    isActive
-                      ? 'border-cyan-400/50 bg-cyan-400/12 shadow-lg shadow-cyan-950/30'
-                      : 'border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]'
-                  }`}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">{screen.eyebrow}</p>
-                  <h2 className="mt-2 text-lg font-semibold text-white">{screen.label}</h2>
-                  <p className="mt-2 text-sm text-slate-400">{screen.summary}</p>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {activeScreen === 'athlete' ? (
-          <AthleteDashboard
-            athlete={selectedAthlete}
-            stats={selectedStats}
-            loading={loadingAthlete}
-            onOpenProfile={() => setActiveScreen('profile')}
-            onPrimaryAction={() => {
-              if (athleteSubscriptionActive && selectedAthlete?.highlight_url) {
-                window.open(selectedAthlete.highlight_url, '_blank', 'noopener,noreferrer');
-                return;
-              }
-
-              void handleSubscribe(subscriptionPlans[0]);
-            }}
-            subscriptionActive={athleteSubscriptionActive}
-            highlights={athleteHighlights}
-            latestStatSummary={latestStatSummary}
-            pipelineStatus={pipelineStatus}
-          />
-        ) : null}
-
-        {activeScreen === 'coach' ? (
-          <CoachDashboard
-            onEnterLiveMode={() => setActiveScreen('live')}
-            players={playerRows}
-            performance={averageTeamScore}
-            insights={aiInsights.slice(0, 2)}
-            gamePlan={coachGamePlan}
-            subscriptionActive={coachSubscriptionActive}
-            onUnlock={() => void handleSubscribe(subscriptionPlans[1])}
-          />
-        ) : null}
-
-        {activeScreen === 'live' ? (
-          <LiveGameMode liveSnapshot={liveSnapshot} subscriptionActive={coachSubscriptionActive} onUnlock={() => void handleSubscribe(subscriptionPlans[1])} />
-        ) : null}
-
-        {activeScreen === 'recruiter' ? (
-          <RecruiterDashboard
-            athletes={athletes}
-            loading={loadingRoster}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onOpenProfile={openRecruiterProfile}
-            savedProspects={featuredProspects}
-            subscriptionActive={recruiterSubscriptionActive}
-            onUnlock={() => void handleSubscribe(subscriptionPlans[2])}
-          />
-        ) : null}
-
-        {activeScreen === 'profile' ? <AthleteProfile athlete={selectedAthlete} stats={selectedStats} loading={loadingAthlete} /> : null}
-
-        <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={subscriptionState} onSubscribe={handleSubscribe} />
-      </div>
-    </div>
-  );
-}
-
-function AthleteDashboard({
-  athlete,
-  stats,
-  loading,
-  onOpenProfile,
-  onPrimaryAction,
-  subscriptionActive,
-  highlights,
-  latestStatSummary,
-  pipelineStatus,
-}: {
-  athlete: AthleteRecord | null;
-  stats: StatsRecord | null;
-  loading: boolean;
-  onOpenProfile: () => void;
-  onPrimaryAction: () => void;
-  subscriptionActive: boolean;
-  highlights: string[];
-  latestStatSummary: string[];
-  pipelineStatus: string[];
-}) {
-  const score = athlete?.score ?? 0;
-  const efficiency = calculateEfficiency(stats);
-
-  return (
-    <div className="grid gap-6">
-      <section className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
-        <Panel>
-          {loading ? (
-            <LoadingState label="Loading athlete profile..." />
-          ) : athlete ? (
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex gap-4">
-                <ProfileOrb initials={getInitials(athlete.name)} accent="from-cyan-400 to-emerald-400" />
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.3em] text-cyan-200">Athlete Dashboard</p>
-                    <h2 className="mt-2 text-3xl font-semibold text-white">{athlete.name}</h2>
-                    <p className="mt-1 text-sm text-slate-400">{athlete.position || 'Position pending'} · ID {athlete.id.slice(0, 8)}</p>
-                  </div>
-                  <ul className="flex flex-wrap gap-2" aria-label="Athlete status highlights">
-                    <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">Supabase record synced</li>
-                    <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
-                      {subscriptionActive ? 'Athlete Pro unlocked' : 'Athlete Pro locked'}
-                    </li>
-                    <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
-                      <time dateTime={new Date().toISOString()} aria-label="Data refreshed during this session">
-                        Session synced
-                      </time>
-                    </li>
-                  </ul>
+        <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
+          <Panel title="Team communications" subtitle="Post announcements, project notes, and channel updates.">
+            <div className="space-y-4">
+              <form className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4" onSubmit={addMessage}>
+                <div className="grid gap-3 md:grid-cols-[1fr_1fr_2fr]">
+                  <label className="space-y-2 text-sm text-slate-300">
+                    Channel
+                    <select
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none ring-0"
+                      value={messageDraft.channel}
+                      onChange={(e) => setMessageDraft((current) => ({ ...current, channel: e.target.value }))}
+                    >
+                      <option>Announcements</option>
+                      <option>Operations</option>
+                      <option>Design</option>
+                      <option>Support</option>
+                    </select>
+                  </label>
+                  <label className="space-y-2 text-sm text-slate-300">
+                    Author
+                    <input
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
+                      value={messageDraft.author}
+                      onChange={(e) => setMessageDraft((current) => ({ ...current, author: e.target.value }))}
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-slate-300">
+                    Message
+                    <input
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
+                      placeholder="Share an update with your team"
+                      value={messageDraft.content}
+                      onChange={(e) => setMessageDraft((current) => ({ ...current, content: e.target.value }))}
+                    />
+                  </label>
                 </div>
               </div>
               <button
