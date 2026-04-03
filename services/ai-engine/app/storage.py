@@ -46,6 +46,8 @@ def _extract_public_url(value: Any) -> str | None:
     for attribute in ('publicURL', 'publicUrl', 'public_url', 'data'):
         if hasattr(value, attribute):
             candidate = getattr(value, attribute)
+            if candidate is value:
+                continue
             extracted = _extract_public_url(candidate)
             if extracted:
                 return extracted
