@@ -1,5 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { AiJob, createAiJob, fetchAiJob, isAiEngineConfigured } from '../lib/aiEngineService';
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import { createAiJob, fetchAiJob, isAiEngineConfigured } from '../lib/aiEngineService';
+import type { AiJob } from '../lib/aiEngineService';
 
 const sportOptions = ['soccer', 'basketball', 'football', 'baseball', 'volleyball'];
 
