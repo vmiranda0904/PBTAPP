@@ -1,9 +1,56 @@
 export type AiJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
+export type AiPlayType = 'serve' | 'spike' | 'set' | 'dig' | 'block';
+export type AiPlayResult = 'kill' | 'error' | 'continuation' | 'ace' | 'blocked';
+export type PressureLevel = 'low' | 'medium' | 'high';
+
+export type HeatmapCell = {
+  x_bin: number;
+  y_bin: number;
+  count: number;
+};
+
+export type PlayEvent = {
+  timestamp: number;
+  player_id: number;
+  play_type: AiPlayType;
+  start_position: [number, number];
+  end_position: [number, number];
+  result: AiPlayResult;
+  pressure_level: PressureLevel;
+  sequence_id: number;
+};
+
+export type PlayerScoutingSummary = {
+  player_id: number;
+  player_label: string;
+  total_events: number;
+  spike_count: number;
+  preferred_attack_zone: 'left' | 'middle' | 'right';
+  left_pct: number;
+  middle_pct: number;
+  right_pct: number;
+  kill_rate: number;
+  error_rate: number;
+  under_pressure_rate: number;
+  strengths: string[];
+  weakness?: string | null;
+  heatmap: HeatmapCell[];
+};
+
+export type OpponentProfile = {
+  id: string;
+  team_name: string;
+  players: string[];
+  tendencies: PlayerScoutingSummary[];
+  weaknesses: string[];
+  strengths: string[];
+};
 
 export type AiProcessingReport = {
-  pipeline_mode: 'skeleton';
+  pipeline_mode: 'coach_scouting_preview';
   summary: string;
   sport: string;
+  team_name: string;
   file_name: string;
   video_hash: string;
   file_size_bytes: number;
@@ -13,6 +60,10 @@ export type AiProcessingReport = {
   observability: Record<string, string | number | boolean>;
   immediate_next_steps: string[];
   recommended_gpu_provider: string;
+  play_events: PlayEvent[];
+  opponent_profile?: OpponentProfile | null;
+  game_plan: string[];
+  live_adjustments: string[];
   created_at: string;
 };
 
@@ -20,6 +71,7 @@ export type AiJob = {
   id: string;
   status: AiJobStatus;
   sport: string;
+  team_name: string;
   file_name: string;
   created_at: string;
   updated_at: string;
@@ -51,10 +103,11 @@ export function isAiEngineConfigured() {
   return Boolean(aiEngineUrl);
 }
 
-export async function createAiJob(file: File, sport: string) {
+export async function createAiJob(file: File, sport: string, teamName: string) {
   const formData = new FormData();
   formData.append('video', file);
   formData.append('sport', sport);
+  formData.append('team_name', teamName);
 
   const response = await fetch(`${requireAiEngineUrl()}/jobs`, {
     method: 'POST',

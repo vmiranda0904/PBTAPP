@@ -57,3 +57,26 @@ uvicorn app.main:app --reload
 ```
 
 Set `VITE_AI_ENGINE_URL=http://localhost:8000` in the frontend `.env` file to enable the upload and polling UI.
+
+## Coach scouting AI
+
+The AI engine now layers coach-facing scouting intelligence on top of the video job flow.
+
+### Scouting outputs
+
+- Opponent profiles by team and player
+- Play-event records with timestamp, player, positions, result, and pressure level
+- Tendency analysis for left / middle / right attack preferences
+- Weakness detection based on repeated error patterns
+- Automated game-plan recommendations and live-adjustment prompts
+- Simple positional heatmaps for coach review in the frontend dashboard
+
+### Updated upload contract
+
+`POST /jobs` now accepts:
+
+- `video` — opponent film upload
+- `sport` — sport context, defaulting to `volleyball`
+- `team_name` — opponent name used in the scouting report
+
+The current backend still uses a deterministic preview generator for play events until tracked detections are wired in, but the contract and UI are now ready for real tendency, weakness, and game-plan outputs.

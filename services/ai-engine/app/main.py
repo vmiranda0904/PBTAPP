@@ -15,8 +15,8 @@ from .schemas import CreateJobResponse, HealthResponse, VideoJob
 
 app = FastAPI(
     title='PBTAPP AI Engine',
-    version='0.1.0',
-    summary='Video-analysis service skeleton optimized around sub-60-second processing goals.',
+    version='0.2.0',
+    summary='Video-analysis and coach-scouting service optimized around fast, GPU-ready processing goals.',
 )
 
 app.add_middleware(
@@ -47,6 +47,12 @@ def config() -> dict[str, object]:
             'get_job': 'GET /jobs/{job_id}',
             'download_report': 'GET /jobs/{job_id}/report',
         },
+        'coach_features': [
+            'opponent tendencies',
+            'weakness detection',
+            'game plan generation',
+            'live coaching preview',
+        ],
     }
 
 
@@ -54,7 +60,8 @@ def config() -> dict[str, object]:
 async def create_job(
     background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
-    sport: str = Form('soccer'),
+    sport: str = Form('volleyball'),
+    team_name: str = Form('Opponent team'),
 ) -> CreateJobResponse:
     if not video.filename:
         raise HTTPException(status_code=400, detail='A video filename is required.')
@@ -67,7 +74,8 @@ async def create_job(
     job = VideoJob(
         id=uuid.uuid4().hex,
         status='queued',
-        sport=sport.strip() or 'soccer',
+        sport=sport.strip() or 'volleyball',
+        team_name=team_name.strip() or 'Opponent team',
         file_name=video.filename,
     )
     save_job(job)
