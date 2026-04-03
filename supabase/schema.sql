@@ -38,7 +38,6 @@ create table if not exists jobs (
   user_id text not null,
   team_id text not null,
   status text not null,
-  progress int not null default 0,
   processing_stage text,
   sport text not null,
   team_name text not null default 'Opponent team',
@@ -69,4 +68,4 @@ create index if not exists jobs_user_id_idx on jobs (user_id);
 create index if not exists jobs_team_id_idx on jobs (team_id);
 create index if not exists jobs_status_idx on jobs (status);
 
-alter table jobs add column if not exists progress int not null default 0;
+alter table if exists jobs add column if not exists progress int not null default 0;
