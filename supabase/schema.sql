@@ -19,6 +19,19 @@ create table if not exists stats (
 
 create index if not exists stats_athlete_id_idx on stats (athlete_id);
 
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  full_name text,
+  role text not null default 'athlete',
+  team_id text not null default '',
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists profiles_role_idx on profiles (role);
+create index if not exists profiles_team_id_idx on profiles (team_id);
+
 create table if not exists subscriptions (
   id uuid primary key default gen_random_uuid(),
   customer_email text not null,

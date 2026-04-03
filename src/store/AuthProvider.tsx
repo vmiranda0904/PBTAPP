@@ -78,6 +78,39 @@ function formatRoleLabel(role: AppUserRole) {
   }
 }
 
+function toSupabaseErrorMessage(error: { message?: string } | null | undefined, fallback: string) {
+  const message = error?.message?.trim();
+  return message ? message : fallback;
+}
+
+async function upsertSupabaseProfile(user: SupabaseUser, {
+  email,
+  name,
+  role,
+  teamId,
+}: {
+  email: string;
+  name: string;
+  role: AppUserRole;
+  teamId: string;
+}) {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase.from('profiles').upsert({
+    id: user.id,
+    email,
+    full_name: name,
+    role,
+    team_id: teamId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 async function resolveSupabaseAuthUser(user: SupabaseUser) {
   const authUser = toSupabaseAuthUser(user);
 
@@ -211,11 +244,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [adminTeamId, isAdmin]);
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
-      const dbUser = await getUserByEmail(email.trim());
+      let supabaseLoginError: string | null = null;
+
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (data.user) {
+          setUser(await resolveSupabaseAuthUser(data.user));
+          return { success: true };
+        }
+
+        if (error) {
+          supabaseLoginError = toSupabaseErrorMessage(error, 'Unable to sign in with Supabase.');
+        }
+      }
+
+      const dbUser = await getUserByEmail(normalizedEmail);
 
       if (!dbUser) {
-        return { success: false, message: 'No account found with that email address.' };
+        return { success: false, message: supabaseLoginError ?? 'No account found with that email address.' };
       }
 
       const passwordOk = await verifyPassword(password, dbUser.passwordHash, dbUser.passwordSalt);
@@ -279,7 +332,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const shouldAutoApprove = isTeamCreator || isAdminEmail;
+      const normalizedRole = shouldAutoApprove ? 'admin' : normalizeUserRole(fields.role) ?? 'athlete';
       const settings = await getAppSettings();
+
+      if (supabase) {
+        const displayName = fields.name.trim();
+        const { data, error } = await supabase.auth.signUp({
+          email: emailNorm,
+          password: fields.password,
+          options: {
+            data: {
+              name: displayName,
+              avatar: getInitials(displayName),
+              role: normalizedRole,
+              teamId,
+            },
+          },
+        });
+
+        if (error || !data.user) {
+          return {
+            success: false,
+            message: toSupabaseErrorMessage(error, 'Unable to create your account.'),
+          };
+        }
+
+        await upsertSupabaseProfile(data.user, {
+          email: emailNorm,
+          name: displayName,
+          role: normalizedRole,
+          teamId,
+        });
+
+        if (data.session?.user) {
+          setUser(await resolveSupabaseAuthUser(data.session.user));
+        }
+
+        return {
+          success: true,
+          emailSent: true,
+          autoApproved: true,
+          teamCode: returnedTeamCode,
+          isAdminRegistration: normalizedRole === 'admin',
+        };
+      }
+
       const newUser = await createRegistration(
         { ...fields, teamId, role: shouldAutoApprove ? 'Admin' : fields.role },
         shouldAutoApprove,
