@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import AiVideoPanel from './components/AiVideoPanel';
 
 type TeamMember = {
   id: number;
@@ -274,6 +275,8 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        <AiVideoPanel />
 
         <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
           <Panel title="Team communications" subtitle="Post announcements, project notes, and channel updates.">

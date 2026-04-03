@@ -23,3 +23,37 @@ npm run dev
 npm run lint
 npm run build
 ```
+
+
+## AI engine skeleton
+
+The repository now includes a backend service skeleton at `/home/runner/work/PBTAPP/PBTAPP/services/ai-engine` for sports performance and video-analysis workloads.
+
+### API contract
+
+- `POST /jobs` — upload a video and create an async processing job
+- `GET /jobs/{job_id}` — poll job state and retrieve the latest report payload
+- `GET /jobs/{job_id}/report` — download the generated JSON report
+- `GET /health` — inspect device selection and pipeline defaults
+
+### Performance-first defaults in v1
+
+- Frame skipping defaults to every 3rd frame
+- Detection cadence defaults to every 5th eligible frame
+- Frames are resized to `640x360` before model inference
+- Default model target is `yolov8n.pt`
+- Result caching is keyed by the uploaded video hash
+- FFmpeg export defaults are `-preset ultrafast -crf 28`
+- GPU deployment is designed around `cuda` when available and recommends RunPod for production
+
+### Run the AI engine locally
+
+```bash
+cd services/ai-engine
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Set `VITE_AI_ENGINE_URL=http://localhost:8000` in the frontend `.env` file to enable the upload and polling UI.
