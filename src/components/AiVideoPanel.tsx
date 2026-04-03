@@ -5,7 +5,7 @@ import ErrorBoundary from './ErrorBoundary';
 import JobProgress from './JobProgress';
 import { createAiJob, fetchAiJob, isAiEngineConfigured, isRenderableAiReport } from '../lib/aiEngineService';
 import type { AiJob } from '../lib/aiEngineService';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/modules/auth/useAuth';
 
 const sportOptions = ['volleyball', 'soccer', 'basketball', 'football', 'baseball'];
 const MAX_POLL_ATTEMPTS = 30;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/modules/auth/useAuth';
 import { Link } from 'react-router-dom';
 import { format, parseISO, isAfter } from 'date-fns';
 import { Trophy, Star, Users, CalendarDays, TrendingUp, MessageSquare, UserCheck, CheckCircle, XCircle, Loader, ShieldAlert } from 'lucide-react';
