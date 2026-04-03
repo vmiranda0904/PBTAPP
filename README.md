@@ -1,6 +1,6 @@
 # PBTAPP
 
-A premium React + Vite volleyball product concept wired for real Supabase athlete data, AI pipeline highlights, Stripe subscriptions, a conversion-focused landing page, and investor pitch content.
+A premium React + Vite volleyball product concept wired for real Supabase athlete data, AI pipeline highlights, Stripe subscriptions, a conversion-focused landing page, and investor demo content.
 
 ## Live architecture
 
@@ -14,8 +14,17 @@ Supabase (DB + Storage)
 ↓  
 Stripe (Payments)
 
+## Priority order
+
+1. Investor demo + story
+2. Production deployment
+3. Landing page + onboarding
+4. User acquisition
+
 ## Product surfaces
 
+- Demo-ready landing / entry flow
+- Demo script and investor pitch content
 - Landing page with hero, feature grid, pricing, and CTA
 - Onboarding flow for athlete, coach, and recruiter roles
 - Athlete dashboard
@@ -85,6 +94,10 @@ Stripe (Payments)
 - highlight appears
 - Stripe checkout works
 - subscription unlocks feature
+
+## Demo mode
+
+Set `VITE_DEMO_MODE=true` to keep the walkthrough stable even when live services are unavailable. Demo mode fills the athlete, coach, live, and recruiter flows with polished sample data for rehearsals and investor presentations.
 
 ## Investor pitch
 

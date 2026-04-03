@@ -2,6 +2,10 @@ import Stripe from 'stripe';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
+function normalizeEmail(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : undefined;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -16,7 +20,7 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
   const priceId = body?.priceId;
-  const customerEmail = typeof body?.customerEmail === 'string' ? body.customerEmail.trim().toLowerCase() : undefined;
+  const customerEmail = normalizeEmail(body?.customerEmail);
   const planKey = typeof body?.planKey === 'string' ? body.planKey.trim().toLowerCase() : undefined;
 
   if (!priceId) {

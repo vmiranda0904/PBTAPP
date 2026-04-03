@@ -6,6 +6,10 @@ const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
+function normalizeEmail(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : null;
+}
+
 function getSupabaseAdmin() {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error('Missing Supabase admin credentials for webhook processing.');
@@ -38,9 +42,9 @@ function mapSubscriptionRecord(sessionOrSubscription, statusOverride) {
 
   return {
     customer_email:
-      sessionOrSubscription.customer_details?.email ??
-      sessionOrSubscription.customer_email ??
-      metadata.customerEmail ??
+      normalizeEmail(sessionOrSubscription.customer_details?.email) ??
+      normalizeEmail(sessionOrSubscription.customer_email) ??
+      normalizeEmail(metadata.customerEmail) ??
       null,
     plan_key: metadata.planKey ?? 'unknown',
     status,
@@ -101,12 +105,12 @@ export default async function handler(req, res) {
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object;
       const customer = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
-      let customerEmail = subscription.metadata?.customerEmail ?? null;
+      let customerEmail = normalizeEmail(subscription.metadata?.customerEmail);
 
       if (!customerEmail && customer) {
         const customerResponse = await stripe.customers.retrieve(customer);
         if (!('deleted' in customerResponse) && customerResponse.email) {
-          customerEmail = customerResponse.email.toLowerCase();
+          customerEmail = normalizeEmail(customerResponse.email);
         }
       }
 

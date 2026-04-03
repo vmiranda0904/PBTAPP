@@ -80,12 +80,13 @@ const SCORE_RING_PRIMARY = '#22d3ee';
 const SCORE_RING_SECONDARY = '#22c55e';
 const SCORE_RING_ACCENT_SPAN = 4;
 const MIN_TREND_BAR_HEIGHT = 18;
-const TREND_POINTS = [32, 48, 57, 61, 73, 84, 96];
+const DEFAULT_TREND_CHART_POINTS = [32, 48, 57, 61, 73, 84, 96];
 
 const athleteProPriceId = import.meta.env.VITE_STRIPE_ATHLETE_PRO_PRICE_ID;
 const coachProPriceId = import.meta.env.VITE_STRIPE_COACH_PRO_PRICE_ID;
 const recruiterProPriceId = import.meta.env.VITE_STRIPE_RECRUITER_PRO_PRICE_ID;
 const defaultAthleteId = import.meta.env.VITE_DEFAULT_ATHLETE_ID?.trim() || null;
+const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 const activeSubscriptions = new Set<string>(
   (import.meta.env.VITE_ACTIVE_SUBSCRIPTIONS ?? '')
     .split(',')
@@ -169,6 +170,56 @@ const defaultOnboardingProfile: OnboardingProfile = {
   organization: '',
 };
 
+const demoAthletes: AthleteRecord[] = [
+  {
+    id: '11111111-1111-1111-1111-111111111111',
+    name: 'Sophia Martinez',
+    position: 'OH',
+    score: 96,
+    highlight_url: null,
+  },
+  {
+    id: '22222222-2222-2222-2222-222222222222',
+    name: 'Jake Reynolds',
+    position: 'Setter',
+    score: 91,
+    highlight_url: null,
+  },
+  {
+    id: '33333333-3333-3333-3333-333333333333',
+    name: 'Ava Thompson',
+    position: 'MB',
+    score: 89,
+    highlight_url: null,
+  },
+  {
+    id: '44444444-4444-4444-4444-444444444444',
+    name: 'Mia Chen',
+    position: 'RS',
+    score: 87,
+    highlight_url: null,
+  },
+];
+
+const demoStats: StatsRecord[] = [
+  { id: 'aaaaaaa1-1111-1111-1111-111111111111', athlete_id: '11111111-1111-1111-1111-111111111111', spikes: 18, sets: 2, serves: 6, errors: 3 },
+  { id: 'aaaaaaa2-2222-2222-2222-222222222222', athlete_id: '22222222-2222-2222-2222-222222222222', spikes: 4, sets: 32, serves: 5, errors: 1 },
+  { id: 'aaaaaaa3-3333-3333-3333-333333333333', athlete_id: '33333333-3333-3333-3333-333333333333', spikes: 11, sets: 1, serves: 4, errors: 2 },
+  { id: 'aaaaaaa4-4444-4444-4444-444444444444', athlete_id: '44444444-4444-4444-4444-444444444444', spikes: 13, sets: 1, serves: 7, errors: 4 },
+];
+
+const demoLiveSnapshot: LiveSnapshot = {
+  alerts: ['Player 2 is cross-court heavy', 'Serve zone 5 now'],
+  insights: ['Commit block if middle slides on 31', 'Voice guidance ready for timeout decisions'],
+  stats: {
+    touches: 38,
+    spikes: 17,
+    efficiency: '.344',
+    serve_runs: 3,
+  },
+  status: 'connected',
+};
+
 function getInitials(name: string) {
   if (!name.trim()) return '';
   return name
@@ -220,12 +271,16 @@ export default function App() {
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
   const [loadingRoster, setLoadingRoster] = useState(true);
   const [loadingAthlete, setLoadingAthlete] = useState(true);
-  const [liveSnapshot, setLiveSnapshot] = useState<LiveSnapshot>({
-    alerts: [],
-    insights: [],
-    stats: {},
-    status: import.meta.env.VITE_AI_PIPELINE_URL ? 'connecting' : 'disabled',
-  });
+  const [liveSnapshot, setLiveSnapshot] = useState<LiveSnapshot>(
+    isDemoMode
+      ? demoLiveSnapshot
+      : {
+          alerts: [],
+          insights: [],
+          stats: {},
+          status: import.meta.env.VITE_AI_PIPELINE_URL ? 'connecting' : 'disabled',
+        },
+  );
 
   const supabaseReady = isSupabaseConfigured();
   const aiPipelineUrl = import.meta.env.VITE_AI_PIPELINE_URL;
@@ -241,6 +296,19 @@ export default function App() {
       setDataError(null);
 
       try {
+        if (isDemoMode && !supabaseReady) {
+          const filteredAthletes = searchQuery.trim()
+            ? demoAthletes.filter((athlete) =>
+                `${athlete.name} ${athlete.position ?? ''}`.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+              )
+            : demoAthletes;
+
+          if (cancelled) return;
+          setAthletes(filteredAthletes);
+          setRosterStats(demoStats.filter((stat) => filteredAthletes.some((athlete) => athlete.id === stat.athlete_id)));
+          return;
+        }
+
         const roster = await getAthletes(searchQuery);
         const stats = await getStatsForAthletes(roster.map((athlete) => athlete.id));
 
@@ -265,7 +333,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [searchQuery]);
+  }, [searchQuery, supabaseReady]);
 
   useEffect(() => {
     if (!athletes.length) {
@@ -294,6 +362,15 @@ export default function App() {
       setLoadingAthlete(true);
 
       try {
+        if (isDemoMode && !supabaseReady) {
+          const athlete = demoAthletes.find((item) => item.id === athleteId) ?? null;
+          const stats = demoStats.find((item) => item.athlete_id === athleteId) ?? null;
+          if (cancelled) return;
+          setSelectedAthlete(athlete);
+          setSelectedStats(stats);
+          return;
+        }
+
         const [athlete, stats] = await Promise.all([getAthlete(athleteId), getStats(athleteId)]);
         if (cancelled) return;
 
@@ -316,9 +393,14 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedAthleteId]);
+  }, [selectedAthleteId, supabaseReady]);
 
   useEffect(() => {
+    if (isDemoMode && !aiPipelineUrl) {
+      setLiveSnapshot(demoLiveSnapshot);
+      return;
+    }
+
     if (!aiPipelineUrl) return;
 
     const socket = new WebSocket(toWebSocketUrl(aiPipelineUrl));
@@ -441,10 +523,11 @@ export default function App() {
     : ['No stat row has been saved for this athlete yet.'];
 
   const pipelineStatus = [
+    isDemoMode ? 'Demo mode is on for a stable investor walkthrough.' : null,
     supabaseReady ? 'Supabase connected for live athlete records.' : 'Configure Supabase env vars to load live athlete records.',
     aiPipelineUrl ? 'AI websocket endpoint configured for live insights.' : 'Add VITE_AI_PIPELINE_URL to stream live game insights.',
     athleteHighlights.length ? 'Highlight clip available from the AI pipeline.' : 'The AI pipeline has not saved a highlight URL yet.',
-  ];
+  ].filter((value): value is string => Boolean(value));
 
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
@@ -1820,11 +1903,11 @@ function BarRow({ label, value, color }: { label: string; value: number; color: 
   );
 }
 
-function MiniTrendChart({ tall = false }: { tall?: boolean }) {
+function MiniTrendChart({ tall = false, points = DEFAULT_TREND_CHART_POINTS }: { tall?: boolean; points?: number[] }) {
   return (
     <div className={`rounded-[24px] border border-white/10 bg-white/[0.03] p-4 ${tall ? 'h-[220px]' : ''}`}>
       <div className="flex h-full items-end gap-3">
-        {TREND_POINTS.map((value, index) => (
+        {points.map((value, index) => (
           <div key={`trend-${index}-${value}`} className="flex flex-1 flex-col items-center gap-2">
             <div
               className="w-full rounded-full bg-gradient-to-t from-cyan-400 via-blue-500 to-emerald-400"
