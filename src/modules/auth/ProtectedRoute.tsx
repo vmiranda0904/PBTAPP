@@ -28,10 +28,8 @@ export default function ProtectedRoute({
     return <>{fallback}</>;
   }
 
-  if (allowedRoles?.length) {
-    if (!role || !allowedRoles.includes(role)) {
-      return <>{unauthorizedFallback}</>;
-    }
+  if (allowedRoles?.length && (!role || !allowedRoles.includes(role))) {
+    return <>{unauthorizedFallback}</>;
   }
 
   return <>{children}</>;

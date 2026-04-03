@@ -92,7 +92,7 @@ async function resolveSupabaseAuthUser(user: SupabaseUser) {
     .maybeSingle();
 
   if (error) {
-    console.error('Unable to hydrate Supabase user role:', error);
+    console.error(`Unable to hydrate Supabase user role for ${user.id}:`, error);
     return authUser;
   }
 
