@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import CoachDashboard from './CoachDashboard';
 import ErrorBoundary from './ErrorBoundary';
+import JobProgress from './JobProgress';
 import { createAiJob, fetchAiJob, isAiEngineConfigured, isRenderableAiReport } from '../lib/aiEngineService';
 import type { AiJob } from '../lib/aiEngineService';
 import { useAuth } from '../context/AuthContext';
@@ -247,11 +248,14 @@ export default function AiVideoPanel() {
               <dl className="mt-4 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
                 <InfoRow label="Sport" value={job.sport} />
                 <InfoRow label="Stage" value={job.processing_stage ?? 'Pending'} />
+                <InfoRow label="Progress" value={`${job.progress}%`} />
                 <InfoRow label="Video hash" value={job.video_hash ?? 'Pending'} />
                 <InfoRow label="Total time" value={formatTiming(job.timings_ms.total_ms)} />
                 <InfoRow label="Retries" value={`${job.retry_count ?? 0} / ${job.max_retries ?? 0}`} />
                 <InfoRow label="Payload size" value={job.file_size_bytes ? formatBytes(job.file_size_bytes) : 'Pending'} />
               </dl>
+
+              <JobProgress job={job} />
 
               {job.report ? (
                 <>
