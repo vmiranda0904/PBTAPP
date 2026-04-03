@@ -96,7 +96,7 @@ async function upsertSupabaseProfile(user: SupabaseUser, {
   email: string;
   name: string;
   role: AppUserRole;
-  teamId: string;
+  teamId?: string | null;
 }) {
   if (!supabase) {
     return;
@@ -107,7 +107,9 @@ async function upsertSupabaseProfile(user: SupabaseUser, {
     email,
     full_name: name,
     role,
-    team_id: teamId,
+    team_id: teamId ?? null,
+  }, {
+    onConflict: 'id',
   });
 
   if (error) {

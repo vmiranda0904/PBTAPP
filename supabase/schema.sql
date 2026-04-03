@@ -24,7 +24,7 @@ create table if not exists profiles (
   email text not null unique,
   full_name text,
   role text not null default 'athlete',
-  team_id text not null default '',
+  team_id text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );

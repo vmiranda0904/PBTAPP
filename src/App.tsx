@@ -480,6 +480,8 @@ export default function App() {
     let cancelled = false;
 
     async function loadAthlete() {
+      setSelectedAthlete(null);
+      setSelectedStats(null);
       setLoadingAthlete(true);
 
       try {
@@ -667,12 +669,6 @@ export default function App() {
     if (!allowedScreens.includes('profile')) {
       console.warn('Blocked profile access for the current role.');
       return;
-    }
-
-    if (athleteId !== selectedAthleteId) {
-      setLoadingAthlete(true);
-      setSelectedAthlete(null);
-      setSelectedStats(null);
     }
 
     setSelectedAthleteId(athleteId);
