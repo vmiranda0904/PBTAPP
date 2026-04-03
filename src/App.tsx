@@ -305,7 +305,6 @@ export default function App() {
   const coachSubscriptionActive = subscriptionState.has('coach');
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
   const activeScreenMeta = screens.find((screen) => screen.id === activeScreen) ?? screens[0];
-  const athleteDashboardAthlete = selectedAthlete;
 
   useEffect(() => {
     let cancelled = false;
@@ -580,7 +579,7 @@ export default function App() {
       return;
     }
 
-    setCheckoutMessage("This athlete's highlight video is still being processed. Check back soon.");
+    setCheckoutMessage('The highlight video is still being processed. Check back soon.');
   }
 
   function handleOnboardingComplete(profile: OnboardingProfile) {
@@ -715,7 +714,7 @@ export default function App() {
 
         {activeScreen === 'athlete' ? (
           <AthleteDashboard
-            athlete={athleteDashboardAthlete}
+            athlete={selectedAthlete}
             stats={selectedStats}
             loading={loadingAthlete}
             highlights={athleteHighlights}
