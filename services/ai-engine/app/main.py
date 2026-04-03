@@ -203,6 +203,8 @@ async def create_job(
         storage_path = upload_bytes(f'uploads/{job.id}/{filename}', payload, content_type)
         job.storage_path = storage_path
         job.video_url = get_public_url(storage_path)
+        if not job.video_url:
+            log_event('job_public_url_unavailable', job_id=job.id, storage_path=storage_path)
         job.processing_stage = 'uploaded'
         job = save_job(job)
         enqueue_job(job.id)

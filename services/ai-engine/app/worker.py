@@ -21,6 +21,7 @@ def _worker_loop() -> None:
             continue
 
         try:
+            log_event('job_processing_dequeued', job_id=job_id, queue_size=_QUEUE.qsize())
             process_video_job(job_id)
         finally:
             with _LOCK:

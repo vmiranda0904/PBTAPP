@@ -7,6 +7,9 @@ import type { AiJob } from '../lib/aiEngineService';
 import { useAuth } from '../context/AuthContext';
 
 const sportOptions = ['volleyball', 'soccer', 'basketball', 'football', 'baseball'];
+const MAX_POLL_ATTEMPTS = 30;
+const POLL_INTERVAL_MS = 2500;
+const POLL_TIMEOUT_SECONDS = (MAX_POLL_ATTEMPTS * POLL_INTERVAL_MS) / 1000;
 
 export default function AiVideoPanel() {
   const { isAuthenticated, user } = useAuth();
@@ -17,6 +20,7 @@ export default function AiVideoPanel() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const timedJobRef = useRef<string | null>(null);
+  const pollStateRef = useRef<{ jobId: string | null; attempts: number }>({ jobId: null, attempts: 0 });
 
   const owner = useMemo(() => (user ? { userId: user.id, teamId: user.teamId } : null), [user]);
 
@@ -25,18 +29,52 @@ export default function AiVideoPanel() {
       return undefined;
     }
 
+    if (pollStateRef.current.jobId !== job.id) {
+      pollStateRef.current = { jobId: job.id, attempts: 0 };
+    }
+
+    if (pollStateRef.current.attempts >= MAX_POLL_ATTEMPTS) {
+      const message = `AI processing timed out after ${MAX_POLL_ATTEMPTS} polling attempts (${POLL_TIMEOUT_SECONDS} seconds).`;
+      setError(message);
+      setJob((currentJob) => (
+        currentJob && currentJob.id === job.id
+          ? { ...currentJob, status: 'failed', processing_stage: 'polling_timeout', error: message }
+          : currentJob
+      ));
+      return undefined;
+    }
+
     const timeoutId = window.setTimeout(async () => {
       try {
+        pollStateRef.current = { jobId: job.id, attempts: pollStateRef.current.attempts + 1 };
         const refreshedJob = await fetchAiJob(job.id, owner);
+        if (!refreshedJob) {
+          throw new Error('Job not found.');
+        }
+        setError('');
         setJob(refreshedJob);
       } catch (pollError) {
+        const message = pollError instanceof Error ? pollError.message : 'Unable to refresh AI engine status.';
         console.error('AI polling error:', pollError);
-        setError(pollError instanceof Error ? pollError.message : 'Unable to refresh AI engine status.');
+        setError(message);
+        if (message === 'Job not found.') {
+          setJob((currentJob) => (
+            currentJob && currentJob.id === job.id
+              ? { ...currentJob, status: 'failed', processing_stage: 'job_missing', error: message }
+              : currentJob
+          ));
+        }
       }
-    }, 2500);
+    }, POLL_INTERVAL_MS);
 
     return () => window.clearTimeout(timeoutId);
   }, [job, owner]);
+
+  useEffect(() => {
+    if (!job || job.status === 'completed' || job.status === 'failed') {
+      pollStateRef.current = { jobId: null, attempts: 0 };
+    }
+  }, [job]);
 
   useEffect(() => {
     if (!job) return;
@@ -82,6 +120,7 @@ export default function AiVideoPanel() {
       console.time('AI upload');
       const queuedJob = await createAiJob(selectedFile, selectedSport, teamName.trim() || 'Opponent team', owner);
       console.timeEnd('AI upload');
+      pollStateRef.current = { jobId: queuedJob.id, attempts: 0 };
       setJob(queuedJob);
     } catch (submitError) {
       console.error('AI submission error:', submitError);

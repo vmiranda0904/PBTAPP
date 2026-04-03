@@ -19,7 +19,7 @@ from .scoring_engine import calculate_score, rank_athletes
 from .schemas import AthleteRanking, MatchupInsight, PlayEvent, PlaybookItem, PriorityAlert, ProcessingReport, StageTimings, VideoJob
 from .playbook_engine import generate_playbook
 from .scouting_engine import build_scouting_report
-from .storage import upload_bytes
+from .storage import download_bytes, upload_bytes
 from .team_matchup import team_matchup
 
 DEMO_PLAYER_IDS = range(1, 5)
@@ -50,6 +50,14 @@ def _download_video_bytes(video_url: str) -> bytes:
     _validate_video_url(video_url)
     with urlopen(video_url, timeout=30) as response:  # nosec B310
         return response.read()
+
+
+def _read_video_payload(job: VideoJob) -> bytes:
+    if job.storage_path:
+        return download_bytes(job.storage_path)
+    if job.video_url:
+        return _download_video_bytes(job.video_url)
+    raise RuntimeError('Job is missing both storage_path and video_url; cannot retrieve video for processing.')
 
 
 def _biased_end_x(rng: random.Random, bias: str) -> float:
@@ -192,12 +200,9 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
     job = save_job(job)
     log_event('job_processing_started', job_id=job.id, attempt=attempt, storage_path=job.storage_path, video_url=job.video_url)
 
-    if not job.video_url:
-        raise RuntimeError('Missing video URL for queued job.')
-
     ingest_start = time.perf_counter()
     job.processing_stage = 'reading_storage'
-    video_bytes = _download_video_bytes(job.video_url)
+    video_bytes = _read_video_payload(job)
     timings.ingest_ms = round((time.perf_counter() - ingest_start) * 1000, 2)
     job.file_size_bytes = len(video_bytes)
     job = save_job(job)
