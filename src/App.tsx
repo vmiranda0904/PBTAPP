@@ -19,18 +19,19 @@ import {
   Video,
 } from 'lucide-react';
 import AiVideoPanel from './components/AiVideoPanel';
+import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
-import {
-  getActiveSubscriptions,
-  getAthlete,
-  getAthletes,
-  getStats,
-  getStatsForAthletes,
-  isSupabaseConfigured,
-  type AthleteRecord,
-  type StatsRecord,
-} from './lib/api';
-import { subscribeToCheckout } from './lib/checkout';
+import Login from './pages/Login';
+import { useAuth } from './context/AuthContext';
+
+type TeamMember = {
+  id: number;
+  name: string;
+  role: string;
+  team: string;
+  location: string;
+  status: 'Available' | 'Busy' | 'Out';
+};
 
 type LiveSnapshot = {
   alerts: string[];
@@ -591,19 +592,8 @@ export default function App() {
     return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
   }
 
-  const activeScreenMeta = screens.find((screen) => screen.id === activeScreen) ?? screens[0];
-  const athleteDashboardAthlete = loadingAthlete ? null : selectedAthlete;
-
-  function handleAthletePrimaryAction() {
-    if (athleteSubscriptionActive && selectedAthlete?.highlight_url) {
-      window.open(selectedAthlete.highlight_url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    const athletePlan = subscriptionPlans.find((plan) => plan.key === 'athlete');
-    if (athletePlan) {
-      void handleSubscribe(athletePlan);
-    }
+  if (!isAuthenticated) {
+    return <Login />;
   }
 
   return (
@@ -688,8 +678,19 @@ export default function App() {
           <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={subscriptionState} onSubscribe={(plan) => void handleSubscribe(plan)} />
         </section>
 
-        <ProductPlatformPanel />
-        <AiVideoPanel />
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+          >
+            Sign out
+          </button>
+        </div>
+
+        <ErrorBoundary title="AI scouting unavailable" message="The AI scouting workspace failed to load safely.">
+          <AiVideoPanel />
+        </ErrorBoundary>
 
         {activeScreen === 'athlete' ? (
           <AthleteDashboard
