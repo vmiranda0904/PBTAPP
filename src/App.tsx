@@ -278,7 +278,7 @@ function getScreenMeta(screenId: ScreenKey) {
 }
 
 export default function App() {
-  const auth = useAuth();
+  const authContext = useAuth();
   const [stage, setStage] = useState<AppStage>('landing');
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
   const [onboardingProfile, setOnboardingProfile] = useState<OnboardingProfile>(defaultOnboardingProfile);
@@ -613,7 +613,7 @@ export default function App() {
     return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
   }
 
-  if (!auth.isAuthenticated) {
+  if (!authContext.isAuthenticated) {
     return <Login />;
   }
 
@@ -702,7 +702,7 @@ export default function App() {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={auth.logout}
+            onClick={authContext.logout}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
           >
             Sign out

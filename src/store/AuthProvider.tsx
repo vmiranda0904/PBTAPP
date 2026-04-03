@@ -16,8 +16,8 @@ import { showBrowserNotification } from '../lib/pushNotificationService';
 import { getAppSettings } from '../lib/settingsService';
 import { createTeam, getTeamByCode } from '../lib/teamService';
 
-const STORAGE_KEY = 'pbt_auth_user';
 const ADMIN_EMAIL_ENV = ((import.meta.env.VITE_ADMIN_EMAIL as string | undefined) ?? '').toLowerCase().trim();
+const DEFAULT_AVATAR_INITIALS = 'PB';
 
 function getInitials(value: string) {
   const parts = value
@@ -26,7 +26,7 @@ function getInitials(value: string) {
     .filter(Boolean);
 
   if (!parts.length) {
-    return 'PB';
+    return DEFAULT_AVATAR_INITIALS;
   }
 
   return parts
@@ -63,31 +63,8 @@ function toSupabaseAuthUser(user: SupabaseUser): AuthUser {
   };
 }
 
-function readStoredUser() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(saved) as AuthUser;
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
-
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      return;
-    }
-
-    localStorage.removeItem(STORAGE_KEY);
-  }, [user]);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -123,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isAdmin = !!user && user.role === 'Admin';
+  const adminTeamId = user?.teamId;
   const seenPendingIds = useRef<Set<string>>(new Set());
   const isFirstSnapshot = useRef(true);
 
@@ -155,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
           }
         }
-      }, user.teamId);
+      }, adminTeamId);
     });
 
     return () => {
@@ -163,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe?.();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [adminTeamId, isAdmin]);
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
     try {
