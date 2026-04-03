@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from supabase import Client, create_client
 
@@ -29,12 +30,29 @@ def download_bytes(storage_path: str) -> bytes:
     return get_supabase_client().storage.from_(SUPABASE_STORAGE_BUCKET).download(storage_path)
 
 
-def get_public_url(storage_path: str) -> str:
+def _extract_public_url(value: Any) -> str | None:
+    if isinstance(value, str):
+        candidate = value.strip()
+        return candidate or None
+
+    if isinstance(value, dict):
+        candidate = value.get('publicURL') or value.get('publicUrl') or value.get('public_url')
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+        data = value.get('data')
+        if data is not value:
+            return _extract_public_url(data)
+
+    for attribute in ('publicURL', 'publicUrl', 'public_url', 'data'):
+        if hasattr(value, attribute):
+            candidate = getattr(value, attribute)
+            extracted = _extract_public_url(candidate)
+            if extracted:
+                return extracted
+
+    return None
+
+
+def get_public_url(storage_path: str) -> str | None:
     public_url = get_supabase_client().storage.from_(SUPABASE_STORAGE_BUCKET).get_public_url(storage_path)
-    if isinstance(public_url, str) and public_url:
-        return public_url
-    if isinstance(public_url, dict):
-        candidate = str(public_url.get('publicURL') or public_url.get('publicUrl') or '')
-        if candidate:
-            return candidate
-    raise RuntimeError('Unable to determine Supabase public URL for uploaded video.')
+    return _extract_public_url(public_url)
