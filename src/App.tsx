@@ -1,4 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  Activity,
+  ArrowRight,
+  BarChart3,
+  Bell,
+  CheckCircle2,
+  Gauge,
+  Lock,
+  Mic,
+  Play,
+  Search,
+  Share2,
+  Shield,
+  Target,
+  TrendingUp,
+  Trophy,
+  Users,
+  Video,
+} from 'lucide-react';
 import AiVideoPanel from './components/AiVideoPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
@@ -40,6 +59,23 @@ type OnboardingProfile = {
   height: string;
   teamName: string;
   organization: string;
+};
+
+type ScreenKey = 'athlete' | 'coach' | 'live' | 'recruiter' | 'profile';
+
+type Screen = {
+  id: ScreenKey;
+  label: string;
+  eyebrow: string;
+  summary: string;
+};
+
+type TeamMessage = {
+  id: number;
+  channel: string;
+  author: string;
+  content: string;
+  timestamp: string;
 };
 
 const screens: Screen[] = [
@@ -193,6 +229,11 @@ const demoLiveSnapshot: LiveSnapshot = {
   },
   status: 'connected',
 };
+
+const defaultTeamMessages: TeamMessage[] = [
+  { id: 1, channel: 'Announcements', author: 'PRIMEAthletix', content: 'Welcome to the live athlete dashboard.', timestamp: 'Just now' },
+  { id: 2, channel: 'Operations', author: 'AI Pipeline', content: 'Stat sync is active and ready for new match data.', timestamp: '2m ago' },
+];
 
 function getInitials(name: string) {
   if (!name.trim()) return '';
@@ -561,8 +602,8 @@ export default function App() {
       <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <header className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/70 p-6 shadow-2xl shadow-black/30 backdrop-blur">
           <div className="flex flex-col gap-4">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
-                PRIMEAthletix
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
+              PRIMEAthletix
               <span className="text-xs tracking-[0.24em] text-emerald-300">Supabase • AI pipeline • subscriptions</span>
             </div>
 
@@ -593,13 +634,49 @@ export default function App() {
                   value={liveSnapshot.status === 'connected' ? 'On' : liveSnapshot.status === 'disabled' ? 'Off' : '...'}
                   detail="AI websocket health"
                 />
-                <StatCard label="Subscriptions" value={[athleteSubscriptionActive, coachSubscriptionActive, recruiterSubscriptionActive].filter(Boolean).length.toString()} detail="Unlocked premium roles" />
+                <StatCard
+                  label="Subscriptions"
+                  value={[athleteSubscriptionActive, coachSubscriptionActive, recruiterSubscriptionActive].filter(Boolean).length.toString()}
+                  detail="Unlocked premium roles"
+                />
               </div>
             </div>
           </div>
         </header>
 
-        <ProductPlatformPanel />
+        {dataError ? (
+          <NoticeBanner icon={<Bell className="h-4 w-4" />} tone="rose" message={dataError} />
+        ) : null}
+
+        {checkoutMessage ? (
+          <NoticeBanner icon={<Bell className="h-4 w-4" />} tone="amber" message={checkoutMessage} />
+        ) : null}
+
+        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <Panel>
+            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">{activeScreenMeta.eyebrow}</p>
+            <h2 className="mt-2 text-3xl font-semibold text-white">{activeScreenMeta.label}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-slate-400">{activeScreenMeta.summary}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {screens.map((screen) => (
+                <button
+                  key={screen.id}
+                  type="button"
+                  onClick={() => setActiveScreen(screen.id)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                    screen.id === activeScreen
+                      ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100'
+                      : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  {screen.label}
+                </button>
+              ))}
+            </div>
+          </Panel>
+
+          <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={subscriptionState} onSubscribe={(plan) => void handleSubscribe(plan)} />
+        </section>
 
         <div className="flex justify-end">
           <button
@@ -615,17 +692,153 @@ export default function App() {
           <AiVideoPanel />
         </ErrorBoundary>
 
-        <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
-          <Panel title="Team communications" subtitle="Post announcements, project notes, and channel updates.">
-            <div className="space-y-4">
-              <form className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4" onSubmit={addMessage}>
+        {activeScreen === 'athlete' ? (
+          <AthleteDashboard
+            athlete={athleteDashboardAthlete}
+            stats={selectedStats}
+            loading={loadingAthlete}
+            highlights={athleteHighlights}
+            latestStatSummary={latestStatSummary}
+            pipelineStatus={pipelineStatus}
+            subscriptionActive={athleteSubscriptionActive}
+            onPrimaryAction={handleAthletePrimaryAction}
+            onOpenProfile={() => setActiveScreen('profile')}
+          />
+        ) : null}
+
+        {activeScreen === 'coach' ? (
+          <CoachDashboard
+            onEnterLiveMode={() => setActiveScreen('live')}
+            players={playerRows}
+            performance={averageTeamScore}
+            insights={aiInsights}
+            gamePlan={coachGamePlan}
+            subscriptionActive={coachSubscriptionActive}
+            onUnlock={() => {
+              const coachPlan = subscriptionPlans.find((plan) => plan.key === 'coach');
+              if (coachPlan) {
+                void handleSubscribe(coachPlan);
+              }
+            }}
+          />
+        ) : null}
+
+        {activeScreen === 'live' ? (
+          <LiveGameMode
+            liveSnapshot={liveSnapshot}
+            subscriptionActive={coachSubscriptionActive}
+            onUnlock={() => {
+              const coachPlan = subscriptionPlans.find((plan) => plan.key === 'coach');
+              if (coachPlan) {
+                void handleSubscribe(coachPlan);
+              }
+            }}
+          />
+        ) : null}
+
+        {activeScreen === 'recruiter' ? (
+          <RecruiterDashboard
+            athletes={athletes}
+            loading={loadingRoster}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onOpenProfile={openRecruiterProfile}
+            savedProspects={featuredProspects}
+            subscriptionActive={recruiterSubscriptionActive}
+            onUnlock={() => {
+              const recruiterPlan = subscriptionPlans.find((plan) => plan.key === 'recruiter');
+              if (recruiterPlan) {
+                void handleSubscribe(recruiterPlan);
+              }
+            }}
+          />
+        ) : null}
+
+        {activeScreen === 'profile' ? (
+          <AthleteProfile athlete={selectedAthlete} stats={selectedStats} loading={loadingAthlete} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function AthleteDashboard({
+  athlete,
+  stats,
+  loading,
+  highlights,
+  latestStatSummary,
+  pipelineStatus,
+  subscriptionActive,
+  onPrimaryAction,
+  onOpenProfile,
+}: {
+  athlete: AthleteRecord | null;
+  stats: StatsRecord | null;
+  loading: boolean;
+  highlights: string[];
+  latestStatSummary: string[];
+  pipelineStatus: string[];
+  subscriptionActive: boolean;
+  onPrimaryAction: () => void;
+  onOpenProfile: () => void;
+}) {
+  const [messageDraft, setMessageDraft] = useState({ channel: 'Announcements', author: '', content: '' });
+  const [messages, setMessages] = useState<TeamMessage[]>(defaultTeamMessages);
+  const efficiency = calculateEfficiency(stats);
+  const score = athlete?.score ?? 0;
+
+  function addMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!messageDraft.author.trim() || !messageDraft.content.trim()) return;
+
+    setMessages((current) => [
+      {
+        id: Date.now(),
+        channel: messageDraft.channel,
+        author: messageDraft.author.trim(),
+        content: messageDraft.content.trim(),
+        timestamp: 'Just now',
+      },
+      ...current,
+    ]);
+    setMessageDraft((current) => ({ ...current, author: '', content: '' }));
+  }
+
+  return (
+    <div className="grid gap-6">
+      <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
+        <Panel>
+          {loading ? (
+            <LoadingState label="Loading athlete dashboard..." />
+          ) : athlete ? (
+            <div className="space-y-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Athlete Dashboard</p>
+                  <h2 className="mt-2 text-3xl font-semibold text-white">{athlete.name}</h2>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {athlete.position || 'Position pending'} · Score {formatScore(athlete.score)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenProfile}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/20"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share Profile
+                </button>
+              </div>
+
+              <form className="grid gap-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4" onSubmit={addMessage}>
                 <div className="grid gap-3 md:grid-cols-[1fr_1fr_2fr]">
                   <label className="space-y-2 text-sm text-slate-300">
                     Channel
                     <select
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none ring-0"
                       value={messageDraft.channel}
-                      onChange={(e) => setMessageDraft((current) => ({ ...current, channel: e.target.value }))}
+                      onChange={(event) => setMessageDraft((current) => ({ ...current, channel: event.target.value }))}
                     >
                       <option>Announcements</option>
                       <option>Operations</option>
@@ -638,7 +851,7 @@ export default function App() {
                     <input
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       value={messageDraft.author}
-                      onChange={(e) => setMessageDraft((current) => ({ ...current, author: e.target.value }))}
+                      onChange={(event) => setMessageDraft((current) => ({ ...current, author: event.target.value }))}
                     />
                   </label>
                   <label className="space-y-2 text-sm text-slate-300">
@@ -647,19 +860,32 @@ export default function App() {
                       className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-slate-50 outline-none"
                       placeholder="Share an update with your team"
                       value={messageDraft.content}
-                      onChange={(e) => setMessageDraft((current) => ({ ...current, content: e.target.value }))}
+                      onChange={(event) => setMessageDraft((current) => ({ ...current, content: event.target.value }))}
                     />
                   </label>
                 </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+                  >
+                    Post update
+                  </button>
+                </div>
+              </form>
+
+              <div className="space-y-3">
+                {messages.map((message) => (
+                  <div key={message.id} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-[0.22em] text-slate-400">
+                      <span>{message.channel}</span>
+                      <span>{message.timestamp}</span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-white">{message.author}</p>
+                    <p className="mt-1 text-sm text-slate-300">{message.content}</p>
+                  </div>
+                ))}
               </div>
-              <button
-                type="button"
-                onClick={onOpenProfile}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/20"
-              >
-                <Share2 className="h-4 w-4" />
-                Share Profile
-              </button>
             </div>
           ) : (
             <EmptyState title="No athlete selected" detail="Add athlete rows in Supabase to populate this view." />
@@ -702,17 +928,8 @@ export default function App() {
           action={subscriptionActive ? 'Open highlight' : 'Subscribe'}
           onAction={onPrimaryAction}
         />
-        <InfoCard
-          icon={<BarChart3 className="h-5 w-5" />}
-          title="View Stats"
-          items={latestStatSummary}
-        />
-        <InfoCard
-          icon={<TrendingUp className="h-5 w-5" />}
-          title="Pipeline Status"
-          items={pipelineStatus}
-          footer={<MiniTrendChart />}
-        />
+        <InfoCard icon={<BarChart3 className="h-5 w-5" />} title="View Stats" items={latestStatSummary} />
+        <InfoCard icon={<TrendingUp className="h-5 w-5" />} title="Pipeline Status" items={pipelineStatus} footer={<MiniTrendChart />} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
