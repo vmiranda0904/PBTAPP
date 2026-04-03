@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
   ArrowRight,
@@ -51,8 +52,6 @@ type SubscriptionPlan = {
   description: string;
   priceId?: string;
 };
-
-type AppStage = 'landing' | 'onboarding' | 'dashboard' | 'pitch';
 
 type UserRole = 'athlete' | 'coach' | 'recruiter';
 
@@ -309,6 +308,29 @@ function getAllowedScreensForRole(role: AppUserRole | null): ScreenKey[] {
   }
 }
 
+function getDashboardPath(screen: ScreenKey) {
+  return `/dashboard/${screen}`;
+}
+
+function getDashboardScreenFromPath(pathname: string): ScreenKey | null {
+  const [, dashboardSegment, screenSegment] = pathname.replace(/\/+$/, '').split('/');
+
+  if (dashboardSegment !== 'dashboard') {
+    return null;
+  }
+
+  switch (screenSegment) {
+    case 'athlete':
+    case 'coach':
+    case 'live':
+    case 'recruiter':
+    case 'profile':
+      return screenSegment;
+    default:
+      return null;
+  }
+}
+
 function toOnboardingRole(role: AppUserRole | null): UserRole {
   switch (role) {
     case 'admin':
@@ -325,8 +347,8 @@ function toOnboardingRole(role: AppUserRole | null): UserRole {
 export default function App() {
   const authContext = useAuth();
   const { role: userRole, loading: loadingUserRole } = useUserRole(authContext.user);
-  const [stage, setStage] = useState<AppStage>('landing');
-  const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [onboardingProfile, setOnboardingProfile] = useState<OnboardingProfile>(defaultOnboardingProfile);
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(defaultAthleteId);
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteRecord | null>(null);
@@ -357,16 +379,11 @@ export default function App() {
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
   const allowedScreens = useMemo(() => getAllowedScreensForRole(userRole), [userRole]);
   const roleFilteredScreens = useMemo(() => screens.filter((screen) => allowedScreens.includes(screen.id)), [allowedScreens]);
-
-  useEffect(() => {
-    setStage((current) => {
-      if (authContext.isAuthenticated) {
-        return current === 'landing' ? 'dashboard' : current;
-      }
-
-      return current === 'dashboard' ? 'landing' : current;
-    });
-  }, [authContext.isAuthenticated]);
+  const pathname = location.pathname.replace(/\/+$/, '') || '/';
+  const requestedScreen = getDashboardScreenFromPath(pathname);
+  const defaultScreen = getDefaultScreenForRole(userRole);
+  const activeScreen = requestedScreen && allowedScreens.includes(requestedScreen) ? requestedScreen : defaultScreen;
+  const isDashboardPath = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
 
   useEffect(() => {
     if (!authContext.isAuthenticated) {
@@ -381,14 +398,14 @@ export default function App() {
   }, [authContext.isAuthenticated, authContext.user?.email, userRole]);
 
   useEffect(() => {
-    if (!authContext.isAuthenticated || !userRole) {
+    if (!authContext.isAuthenticated || !userRole || !isDashboardPath) {
       return;
     }
 
-    const defaultScreen = getDefaultScreenForRole(userRole);
-
-    setActiveScreen((current) => (allowedScreens.includes(current) ? current : defaultScreen));
-  }, [allowedScreens, authContext.isAuthenticated, userRole]);
+    if (pathname === '/dashboard' || !requestedScreen || !allowedScreens.includes(requestedScreen)) {
+      navigate(getDashboardPath(defaultScreen), { replace: true });
+    }
+  }, [allowedScreens, authContext.isAuthenticated, defaultScreen, isDashboardPath, navigate, pathname, requestedScreen, userRole]);
 
   useEffect(() => {
     let cancelled = false;
@@ -651,7 +668,7 @@ export default function App() {
     }
 
     setSelectedAthleteId(athleteId);
-    setActiveScreen('profile');
+    navigate(getDashboardPath('profile'));
   }
 
   const onAthletePrimaryAction = useAthletePrimaryAction({
@@ -670,32 +687,47 @@ export default function App() {
 
   function handleOnboardingComplete(profile: OnboardingProfile) {
     setOnboardingProfile(profile);
-    setStage('dashboard');
-    setActiveScreen(profile.role === 'coach' ? 'coach' : profile.role === 'recruiter' ? 'recruiter' : 'athlete');
+    navigate(getDashboardPath(profile.role === 'coach' ? 'coach' : profile.role === 'recruiter' ? 'recruiter' : 'athlete'));
   }
 
-  if (stage === 'landing') {
+  if (pathname === '/') {
+    if (authContext.isAuthenticated) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
     return (
       <LandingPage
         plans={subscriptionPlans}
-        onGetStarted={() => setStage('onboarding')}
-        onViewPitch={() => setStage('pitch')}
+        onGetStarted={() => navigate('/onboarding')}
+        onViewPitch={() => navigate('/pitch')}
       />
     );
   }
 
-  if (stage === 'onboarding') {
+  if (pathname === '/login') {
+    if (authContext.isAuthenticated) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
+    return <Login />;
+  }
+
+  if (pathname === '/onboarding') {
     return (
       <OnboardingFlow
         value={onboardingProfile}
-        onBack={() => setStage('landing')}
+        onBack={() => navigate('/')}
         onComplete={handleOnboardingComplete}
       />
     );
   }
 
-  if (stage === 'pitch') {
-    return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
+  if (pathname === '/pitch') {
+    return <InvestorPitchDeck slides={pitchSlides} onBack={() => navigate('/')} onGetStarted={() => navigate('/onboarding')} />;
+  }
+
+  if (!isDashboardPath) {
+    return <Navigate to={authContext.isAuthenticated ? '/dashboard' : '/'} replace />;
   }
 
   return (
@@ -704,7 +736,7 @@ export default function App() {
       role={userRole}
       allowedRoles={allDashboardRoles}
       isLoading={authContext.isLoading || loadingUserRole}
-      fallback={<Login />}
+      redirectTo="/login"
       loadingFallback={
         <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
           <div className="mx-auto flex max-w-xl items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
@@ -797,7 +829,7 @@ export default function App() {
                     <button
                       key={screen.id}
                       type="button"
-                      onClick={() => setActiveScreen(screen.id)}
+                      onClick={() => navigate(getDashboardPath(screen.id))}
                       className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
                         screen.id === activeScreen
                           ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100'
@@ -837,13 +869,13 @@ export default function App() {
                 pipelineStatus={pipelineStatus}
                 subscriptionActive={athleteSubscriptionActive}
                 onPrimaryAction={onAthletePrimaryAction}
-                onOpenProfile={() => setActiveScreen('profile')}
+                onOpenProfile={() => navigate(getDashboardPath('profile'))}
               />
             ) : null}
 
             {activeScreen === 'coach' ? (
               <CoachDashboard
-                onEnterLiveMode={() => setActiveScreen('live')}
+                onEnterLiveMode={() => navigate(getDashboardPath('live'))}
                 players={playerRows}
                 performance={averageTeamScore}
                 insights={aiInsights}
