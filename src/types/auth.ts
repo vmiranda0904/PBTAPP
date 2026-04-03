@@ -33,4 +33,5 @@ export interface AuthContextValue {
   approveUser: (uid: string, status: 'approved' | 'rejected') => Promise<boolean>;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isLoading: boolean;
 }

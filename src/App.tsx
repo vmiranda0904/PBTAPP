@@ -132,6 +132,8 @@ const subscriptionPlans: SubscriptionPlan[] = [
   },
 ];
 
+const allDashboardRoles: AppUserRole[] = ['admin', 'athlete', 'coach', 'recruiter'];
+
 const pitchSlides = [
   {
     title: 'Slide 1 — Title',
@@ -697,14 +699,20 @@ export default function App() {
   }
 
   return (
-    <ProtectedRoute user={authContext.user} fallback={<Login />}>
-      {loadingUserRole ? (
+    <ProtectedRoute
+      user={authContext.user}
+      role={userRole}
+      allowedRoles={allDashboardRoles}
+      isLoading={authContext.isLoading || loadingUserRole}
+      fallback={<Login />}
+      loadingFallback={
         <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
           <div className="mx-auto flex max-w-xl items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
             Loading dashboard access...
           </div>
         </div>
-      ) : userRole === null ? (
+      }
+      unauthorizedFallback={
         <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
           <div className="mx-auto max-w-xl rounded-3xl border border-rose-500/30 bg-rose-500/10 p-8 text-center">
             <p className="text-sm uppercase tracking-[0.28em] text-rose-200">Access restricted</p>
@@ -719,7 +727,8 @@ export default function App() {
             </button>
           </div>
         </div>
-      ) : (
+      }
+    >
         <div className="min-h-screen bg-[#050816] text-slate-50">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(34,197,94,0.14),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.88),_rgba(2,6,23,1))]" />
           <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -885,7 +894,6 @@ export default function App() {
             ) : null}
           </div>
         </div>
-      )}
     </ProtectedRoute>
   );
 }

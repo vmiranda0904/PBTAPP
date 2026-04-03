@@ -59,7 +59,7 @@ export function useUserRole(user: UserWithRole) {
         .from('profiles')
         .select('role')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (!active) {
         return;
