@@ -69,6 +69,28 @@ class OpponentProfile(BaseModel):
     strengths: list[str]
 
 
+class MatchupInsight(BaseModel):
+    matchup: str
+    insights: list[str]
+
+
+class PriorityAlert(BaseModel):
+    text: str
+    level: Literal['high', 'medium', 'low']
+
+
+class AthleteRanking(BaseModel):
+    id: str
+    name: str
+    score: float
+    stats: dict[str, float]
+
+
+class PlaybookItem(BaseModel):
+    type: Literal['defense', 'offense']
+    instruction: str
+
+
 class ProcessingReport(BaseModel):
     pipeline_mode: Literal['coach_scouting_preview'] = 'coach_scouting_preview'
     summary: str
@@ -87,6 +109,13 @@ class ProcessingReport(BaseModel):
     opponent_profile: OpponentProfile | None = None
     game_plan: list[str] = Field(default_factory=list)
     live_adjustments: list[str] = Field(default_factory=list)
+    matchup_analysis: list[MatchupInsight] = Field(default_factory=list)
+    live_insights: list[str] = Field(default_factory=list)
+    priority_alerts: list[PriorityAlert] = Field(default_factory=list)
+    athlete_rankings: list[AthleteRanking] = Field(default_factory=list)
+    playbook: list[PlaybookItem] = Field(default_factory=list)
+    defensive_scheme: dict[str, str] = Field(default_factory=dict)
+    pdf_report_url: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -104,6 +133,7 @@ class VideoJob(BaseModel):
     timings_ms: StageTimings = Field(default_factory=StageTimings)
     result_url: str | None = None
     download_url: str | None = None
+    pdf_report_url: str | None = None
 
 
 class CreateJobResponse(BaseModel):

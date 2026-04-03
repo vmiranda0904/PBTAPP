@@ -46,12 +46,15 @@ def config() -> dict[str, object]:
             'create_job': 'POST /jobs',
             'get_job': 'GET /jobs/{job_id}',
             'download_report': 'GET /jobs/{job_id}/report',
+            'download_pdf_report': 'GET /jobs/{job_id}/report.pdf',
         },
         'coach_features': [
             'opponent tendencies',
+            'matchup analysis',
             'weakness detection',
             'game plan generation',
             'live coaching preview',
+            'priority voice alerts',
         ],
     }
 
@@ -103,3 +106,17 @@ def download_job_report(job_id: str) -> FileResponse:
     if not report_path.exists():
         raise HTTPException(status_code=404, detail='Report file not found.')
     return FileResponse(report_path, media_type='application/json', filename=f'{job.id}-report.json')
+
+
+@app.get('/jobs/{job_id}/report.pdf')
+def download_job_pdf_report(job_id: str) -> FileResponse:
+    job = get_job(job_id)
+    if not job or not job.report:
+        raise HTTPException(status_code=404, detail='Report not ready.')
+
+    pdf_path = (REPORTS_DIR / f'{job.id}.pdf').resolve()
+    if pdf_path.parent != REPORTS_DIR.resolve():
+        raise HTTPException(status_code=400, detail='Invalid report path.')
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail='PDF report file not found.')
+    return FileResponse(pdf_path, media_type='application/pdf', filename=f'{job.id}-report.pdf')

@@ -70,6 +70,10 @@ The AI engine now layers coach-facing scouting intelligence on top of the video 
 - Weakness detection based on repeated error patterns
 - Automated game-plan recommendations and live-adjustment prompts
 - Simple positional heatmaps for coach review in the frontend dashboard
+- Team-vs-team matchup analysis and comparison insights
+- Priority-ranked live alerts for the browser voice assistant
+- Athlete scoring/rankings plus auto-generated playbook and defensive scheme outputs
+- Downloadable PDF scouting report artifacts
 
 ### Updated upload contract
 
@@ -80,3 +84,9 @@ The AI engine now layers coach-facing scouting intelligence on top of the video 
 - `team_name` — opponent name used in the scouting report
 
 The current backend still uses a deterministic preview generator for play events until tracked detections are wired in, but the contract and UI are now ready for real tendency, weakness, and game-plan outputs.
+
+### Voice assistant and report artifacts
+
+- High-priority live insights can be spoken through the browser speech API, which automatically uses the active Bluetooth audio output when connected.
+- The AI engine now also produces a local PDF scouting report at `GET /jobs/{job_id}/report.pdf`.
+- When cloud storage credentials are added later, the PDF generation step can be extended to upload and return public share links.

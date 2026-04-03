@@ -1,4 +1,5 @@
 import Heatmap from './Heatmap';
+import VoiceAssistantPanel from './VoiceAssistantPanel';
 import type { AiProcessingReport } from '../lib/aiEngineService';
 
 export default function CoachDashboard({ report }: { report: AiProcessingReport }) {
@@ -69,6 +70,32 @@ export default function CoachDashboard({ report }: { report: AiProcessingReport 
         </div>
 
         <div className="grid gap-4">
+          <VoiceAssistantPanel alerts={report.priority_alerts} />
+          <PanelList
+            title="Priority alerts"
+            items={report.priority_alerts.map((alert) => `${alert.level.toUpperCase()}: ${alert.text}`)}
+            tone="rose"
+          />
+          <PanelList
+            title="Matchup analysis"
+            items={report.matchup_analysis.flatMap((matchup) => matchup.insights.map((insight) => `${matchup.matchup}: ${insight}`))}
+            tone="sky"
+          />
+          <PanelList
+            title="Top athletes"
+            items={report.athlete_rankings.map((athlete) => `${athlete.name} — Score ${athlete.score}`)}
+            tone="emerald"
+          />
+          <PanelList
+            title="Auto playbook"
+            items={report.playbook.map((play) => `${play.type}: ${play.instruction}`)}
+            tone="amber"
+          />
+          <PanelList
+            title="Defensive schemes"
+            items={Object.entries(report.defensive_scheme).map(([player, scheme]) => `${player}: ${scheme}`)}
+            tone="rose"
+          />
           <PanelList title="Game plan" items={report.game_plan} tone="sky" />
           <PanelList title="Live coaching adjustments" items={report.live_adjustments} tone="amber" />
         </div>
@@ -107,7 +134,7 @@ function PanelList({ title, items, tone }: { title: string; items: string[]; ton
     <div className={`rounded-2xl border p-4 ${toneStyles[tone]}`}>
       <p className="text-sm font-medium">{title}</p>
       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm">
-        {items.map((item) => (
+        {(items.length > 0 ? items : ['No items yet']).map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>

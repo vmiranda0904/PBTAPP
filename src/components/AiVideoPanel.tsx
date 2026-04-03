@@ -172,6 +172,8 @@ export default function AiVideoPanel() {
                     <InfoRow label="Model" value={job.report.model} />
                     <InfoRow label="Tracked plays" value={String(job.report.play_events.length)} />
                     <InfoRow label="GPU target" value={job.report.recommended_gpu_provider} />
+                    <InfoRow label="Priority alerts" value={String(job.report.priority_alerts.length)} />
+                    <InfoRow label="Matchups" value={String(job.report.matchup_analysis.length)} />
                   </dl>
                   <div className="mt-4 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 p-4 text-sm text-indigo-100">
                     <p className="font-medium">Immediate next steps</p>
@@ -190,6 +192,16 @@ export default function AiVideoPanel() {
                         rel="noreferrer"
                       >
                         Download scouting report
+                      </a>
+                    ) : null}
+                    {job.report.pdf_report_url ? (
+                      <a
+                        className="rounded-xl border border-fuchsia-300/30 bg-fuchsia-400/15 px-4 py-2 text-sm font-medium text-fuchsia-100 transition hover:bg-fuchsia-400/25"
+                        href={job.report.pdf_report_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Download PDF report
                       </a>
                     ) : null}
                     {job.result_url ? (

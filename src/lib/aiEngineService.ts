@@ -46,6 +46,28 @@ export type OpponentProfile = {
   strengths: string[];
 };
 
+export type MatchupInsight = {
+  matchup: string;
+  insights: string[];
+};
+
+export type PriorityAlert = {
+  text: string;
+  level: 'high' | 'medium' | 'low';
+};
+
+export type AthleteRanking = {
+  id: string;
+  name: string;
+  score: number;
+  stats: Record<string, number>;
+};
+
+export type PlaybookItem = {
+  type: 'defense' | 'offense';
+  instruction: string;
+};
+
 export type AiProcessingReport = {
   pipeline_mode: 'coach_scouting_preview';
   summary: string;
@@ -64,6 +86,13 @@ export type AiProcessingReport = {
   opponent_profile?: OpponentProfile | null;
   game_plan: string[];
   live_adjustments: string[];
+  matchup_analysis: MatchupInsight[];
+  live_insights: string[];
+  priority_alerts: PriorityAlert[];
+  athlete_rankings: AthleteRanking[];
+  playbook: PlaybookItem[];
+  defensive_scheme: Record<string, string>;
+  pdf_report_url?: string | null;
   created_at: string;
 };
 
@@ -81,6 +110,7 @@ export type AiJob = {
   timings_ms: Record<string, number>;
   result_url?: string | null;
   download_url?: string | null;
+  pdf_report_url?: string | null;
 };
 
 const aiEngineUrl = import.meta.env.VITE_AI_ENGINE_URL?.trim() ?? '';
@@ -135,7 +165,14 @@ export async function fetchAiJob(jobId: string) {
 function normalizeJob(job: AiJob): AiJob {
   return {
     ...job,
+    report: job.report
+      ? {
+          ...job.report,
+          pdf_report_url: toAbsoluteUrl(job.report.pdf_report_url),
+        }
+      : job.report,
     result_url: toAbsoluteUrl(job.result_url),
     download_url: toAbsoluteUrl(job.download_url),
+    pdf_report_url: toAbsoluteUrl(job.pdf_report_url),
   };
 }

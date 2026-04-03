@@ -9,9 +9,16 @@ import uuid
 from pathlib import Path
 
 from .config import CACHE_DIR, PIPELINE_DEFAULTS, REPORTS_DIR, UPLOADS_DIR, detect_device, pipeline_defaults_dict
+from .defense_engine import defensive_scheme
 from .job_store import save_job
-from .schemas import PlayEvent, ProcessingReport, StageTimings, VideoJob
+from .live_insights import generate_live_insights
+from .priority_engine import prioritize_insights
+from .report_generator import generate_report
+from .scoring_engine import calculate_score, rank_athletes
+from .schemas import AthleteRanking, MatchupInsight, PlayEvent, PlaybookItem, PriorityAlert, ProcessingReport, StageTimings, VideoJob
+from .playbook_engine import generate_playbook
 from .scouting_engine import build_scouting_report
+from .team_matchup import team_matchup
 
 
 def _sha256_for_file(file_path: Path) -> tuple[str, int]:
@@ -75,6 +82,68 @@ def _generate_demo_events(video_hash: str) -> list[PlayEvent]:
     return events
 
 
+def _build_player_stats(events: list[PlayEvent]) -> dict[int, dict[str, float]]:
+    stats: dict[int, dict[str, float]] = {}
+
+    for event in events:
+        player_stats = stats.setdefault(event.player_id, {'spikes': 0, 'sets': 0, 'serves': 0, 'errors': 0, 'blocks': 0})
+        if event.play_type == 'spike':
+            player_stats['spikes'] += 1
+        elif event.play_type == 'set':
+            player_stats['sets'] += 1
+        elif event.play_type == 'serve':
+            player_stats['serves'] += 1
+        elif event.play_type == 'block':
+            player_stats['blocks'] += 1
+
+        if event.result == 'error':
+            player_stats['errors'] += 1
+
+    return stats
+
+
+def _build_matchup_teams(
+    player_stats: dict[int, dict[str, float]],
+    opponent_profile,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    tendencies_by_player = {summary.player_id: summary for summary in opponent_profile.tendencies}
+    own_team: list[dict[str, object]] = []
+    opponent_team: list[dict[str, object]] = []
+
+    for player_id, summary in tendencies_by_player.items():
+        own_team.append(
+            {
+                'id': f'Prime-{player_id}',
+                'tendencies': {
+                    'left_pct': round(max(0.15, 1 - summary.right_pct), 2),
+                    'right_pct': round(max(0.15, summary.right_pct / 2), 2),
+                },
+                'stats': {
+                    'spikes': player_stats.get(player_id, {}).get('spikes', 0) + 3,
+                    'blocks': player_stats.get(player_id, {}).get('blocks', 0) + 1,
+                },
+                'weakness': 'balanced_defense',
+            }
+        )
+        opponent_team.append(
+            {
+                'id': f'Opponent-{player_id}',
+                'tendencies': {
+                    'left_pct': summary.left_pct,
+                    'right_pct': summary.right_pct,
+                    'serve_target': 'zone_1' if summary.under_pressure_rate > 0.4 else 'zone_5',
+                },
+                'stats': {
+                    'spikes': player_stats.get(player_id, {}).get('spikes', 0),
+                    'blocks': player_stats.get(player_id, {}).get('blocks', 0),
+                },
+                'weakness': 'right_defense' if summary.right_pct < 0.25 else 'balanced_defense',
+            }
+        )
+
+    return own_team, opponent_team
+
+
 def process_video_job(job: VideoJob, uploaded_path: Path) -> None:
     overall_start = time.perf_counter()
     timings = StageTimings()
@@ -133,6 +202,37 @@ def process_video_job(job: VideoJob, uploaded_path: Path) -> None:
 
         tendency_start = time.perf_counter()
         opponent_profile, game_plan, live_adjustments = build_scouting_report(job.team_name, events)
+        player_stats = _build_player_stats(events)
+        tendency_map = {
+            summary.player_id: {
+                'left_pct': summary.left_pct,
+                'middle_pct': summary.middle_pct,
+                'right_pct': summary.right_pct,
+                'kill_rate': summary.kill_rate,
+                'error_rate': summary.error_rate,
+                'under_pressure_rate': summary.under_pressure_rate,
+            }
+            for summary in opponent_profile.tendencies
+        }
+        own_team, opponent_team = _build_matchup_teams(player_stats, opponent_profile)
+        matchup_data = [MatchupInsight(**entry) for entry in team_matchup(own_team, opponent_team)]
+        live_insights = generate_live_insights(tendency_map, player_stats)
+        priority_alerts = [PriorityAlert(**entry) for entry in prioritize_insights(live_insights)]
+        playbook = [PlaybookItem(**entry) for entry in generate_playbook(tendency_map)]
+        defense_plan = defensive_scheme(tendency_map)
+        athlete_rankings = [
+            AthleteRanking(
+                id=f'player-{player_id}',
+                name=f'Player {player_id}',
+                score=calculate_score(stats),
+                stats=stats,
+            )
+            for player_id, stats in player_stats.items()
+        ]
+        athlete_rankings = [
+            AthleteRanking.model_validate(entry)
+            for entry in rank_athletes([ranking.model_dump() for ranking in athlete_rankings])
+        ]
         timings.tendency_ms = round((time.perf_counter() - tendency_start) * 1000, 2)
         timings.weakness_ms = timings.tendency_ms
         timings.gameplan_ms = timings.tendency_ms
@@ -156,21 +256,39 @@ def process_video_job(job: VideoJob, uploaded_path: Path) -> None:
                 'unique_players_detected': len(opponent_profile.players),
                 'play_events_emitted': len(events),
                 'live_coach_mode': 'preview-ready',
+                'priority_alerts': len(priority_alerts),
             },
             immediate_next_steps=[
                 'Replace the demo scouting event generator with tracked detections from OpenCV and Ultralytics.',
-                'Feed live tendency deltas through WebSocket updates for in-game coaching alerts.',
-                'Render highlight clips for the hottest attack zones and repeated weakness triggers.',
+                'Feed live tendency deltas through WebSocket updates for in-game coaching alerts and Bluetooth voice playback.',
+                'Swap the local PDF artifact for cloud-backed share links when storage credentials are available.',
             ],
             play_events=events,
             opponent_profile=opponent_profile,
             game_plan=game_plan,
             live_adjustments=live_adjustments,
+            matchup_analysis=matchup_data,
+            live_insights=live_insights,
+            priority_alerts=priority_alerts,
+            athlete_rankings=athlete_rankings,
+            playbook=playbook,
+            defensive_scheme=defense_plan,
         )
         timings.stats_ms = round((time.perf_counter() - stats_start) * 1000, 2)
 
         render_start = time.perf_counter()
         report_path = REPORTS_DIR / f'{job.id}.json'
+        pdf_path = REPORTS_DIR / f'{job.id}.pdf'
+        generate_report(
+            {
+                'team_name': job.team_name,
+                'summary': report.summary,
+                'stats': {ranking.name: ranking.stats for ranking in athlete_rankings},
+                'insights': [alert.text for alert in priority_alerts] or live_insights,
+            },
+            str(pdf_path),
+        )
+        report.pdf_report_url = f'/jobs/{job.id}/report.pdf'
         report_json = report.model_dump_json(indent=2)
         report_path.write_text(report_json)
         cached_report_path.write_text(report_json)
@@ -180,6 +298,7 @@ def process_video_job(job: VideoJob, uploaded_path: Path) -> None:
         job.status = 'completed'
         job.result_url = f'/jobs/{job.id}'
         job.download_url = f'/jobs/{job.id}/report'
+        job.pdf_report_url = report.pdf_report_url
         timings.total_ms = round((time.perf_counter() - overall_start) * 1000, 2)
         job.timings_ms = timings
         save_job(job)
