@@ -31,8 +31,10 @@ def download_bytes(storage_path: str) -> bytes:
 
 def get_public_url(storage_path: str) -> str:
     public_url = get_supabase_client().storage.from_(SUPABASE_STORAGE_BUCKET).get_public_url(storage_path)
-    if isinstance(public_url, str):
+    if isinstance(public_url, str) and public_url:
         return public_url
     if isinstance(public_url, dict):
-        return str(public_url.get('publicURL') or public_url.get('publicUrl') or '')
-    return str(public_url)
+        candidate = str(public_url.get('publicURL') or public_url.get('publicUrl') or '')
+        if candidate:
+            return candidate
+    raise RuntimeError('Unable to determine Supabase public URL for uploaded video.')

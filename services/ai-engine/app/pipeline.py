@@ -48,7 +48,7 @@ def _validate_video_url(video_url: str) -> None:
 
 def _download_video_bytes(video_url: str) -> bytes:
     _validate_video_url(video_url)
-    with urlopen(video_url) as response:  # nosec B310
+    with urlopen(video_url, timeout=30) as response:  # nosec B310
         return response.read()
 
 

@@ -69,7 +69,8 @@ def _validate_job_id(job_id: str) -> str:
     if not JOB_ID_PATTERN.fullmatch(job_id):
         raise HTTPException(status_code=400, detail='Invalid job id.')
     try:
-        return str(uuid.UUID(job_id))
+        uuid.UUID(job_id)
+        return job_id
     except ValueError as exc:
         raise HTTPException(status_code=400, detail='Invalid job id.') from exc
 
