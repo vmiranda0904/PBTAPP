@@ -1,10 +1,13 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Activity,
+  AlertCircle,
   ArrowRight,
-  Bell,
   BarChart3,
+  Bell,
+  CheckCircle2,
   Gauge,
+  Lock,
   Mic,
   Play,
   Search,
@@ -16,6 +19,16 @@ import {
   Users,
   Video,
 } from 'lucide-react';
+import {
+  getAthlete,
+  getAthletes,
+  getStats,
+  getStatsForAthletes,
+  isSupabaseConfigured,
+  type AthleteRecord,
+  type StatsRecord,
+} from './lib/api';
+import { subscribeToCheckout } from './lib/checkout';
 
 type ScreenKey = 'athlete' | 'coach' | 'live' | 'recruiter' | 'profile';
 
@@ -26,96 +39,72 @@ type Screen = {
   summary: string;
 };
 
-type AthleteCard = {
-  name: string;
-  position: string;
-  score: number;
-  gradYear: string;
-  height: string;
-  ranking: string;
+type LiveSnapshot = {
+  alerts: string[];
+  insights: string[];
+  stats: Record<string, number | string>;
+  status: 'disabled' | 'connecting' | 'connected' | 'error';
+};
+
+type SubscriptionPlan = {
+  key: 'athlete' | 'coach' | 'recruiter';
+  label: string;
+  price: string;
+  description: string;
+  priceId?: string;
 };
 
 const screens: Screen[] = [
-  {
-    id: 'athlete',
-    label: 'Athlete Dashboard',
-    eyebrow: 'Performance + Exposure',
-    summary: 'How good am I and how do I get exposure?',
-  },
-  {
-    id: 'coach',
-    label: 'Coach Dashboard',
-    eyebrow: 'Decision Engine',
-    summary: 'How do we win this game?',
-  },
-  {
-    id: 'live',
-    label: 'Live Game Mode',
-    eyebrow: 'In-game Differentiator',
-    summary: 'Minimal taps, fast reads, live adjustments.',
-  },
-  {
-    id: 'recruiter',
-    label: 'Recruiter Dashboard',
-    eyebrow: 'Discovery Engine',
-    summary: 'Find top players fast.',
-  },
-  {
-    id: 'profile',
-    label: 'Athlete Profile',
-    eyebrow: 'Shareable Conversion Page',
-    summary: 'Turn performance into opportunity.',
-  },
-];
-
-const athleteCards: AthleteCard[] = [
-  { name: 'Maya Brooks', position: 'OH', score: 94, gradYear: '2027', height: '6′0″', ranking: '#8 West' },
-  { name: 'Avery Nguyen', position: 'S', score: 91, gradYear: '2026', height: '5′10″', ranking: '#2 Setter' },
-  { name: 'Jordan Ellis', position: 'MB', score: 89, gradYear: '2028', height: '6′2″', ranking: '#11 National' },
-  { name: 'Sydney Flores', position: 'RS', score: 87, gradYear: '2027', height: '6′1″', ranking: '#5 Region' },
-];
-
-const athleteFeed = {
-  highlights: [
-    '12-kill semifinal cut with serve pressure overlays',
-    'Transition scoring reel from last three tournaments',
-    'Defensive pickup montage shared by club coach',
-  ],
-  games: [
-    'vs Skyline Elite · 18 kills · .412 efficiency',
-    'vs Coast VC · 4 aces · 21 perfect passes',
-    'vs NorCal Surge · 9 digs · 3 stuffs',
-  ],
-  feedback: [
-    'First-step explosion is improving. Keep swinging high hands.',
-    'Recruiting profile is trending after last showcase weekend.',
-  ],
-};
-
-const coachPlayers = [
-  { name: 'Maya Brooks', kills: 18, errors: 4, efficiency: '.412' },
-  { name: 'Avery Nguyen', kills: 4, errors: 1, efficiency: '.375' },
-  { name: 'Jordan Ellis', kills: 9, errors: 2, efficiency: '.389' },
-  { name: 'Sydney Flores', kills: 11, errors: 5, efficiency: '.240' },
-];
-
-const recruiterSaved = ['Maya Brooks · OH · 2027', 'Jordan Ellis · MB · 2028', 'Avery Nguyen · S · 2026'];
-
-const profileBreakdown = [
-  { label: 'Vertical', value: '10′2″' },
-  { label: 'Approach touch', value: '10′5″' },
-  { label: 'Serve velocity', value: '49 mph' },
-  { label: 'Passing rating', value: '2.34' },
+  { id: 'athlete', label: 'Athlete Dashboard', eyebrow: 'Performance + Exposure', summary: 'Real stats, highlights, and recruiting momentum.' },
+  { id: 'coach', label: 'Coach Dashboard', eyebrow: 'Decision Engine', summary: 'Roster production plus live AI insight.' },
+  { id: 'live', label: 'Live Game Mode', eyebrow: 'In-game Differentiator', summary: 'Streaming AI insights and live stat updates.' },
+  { id: 'recruiter', label: 'Recruiter Dashboard', eyebrow: 'Discovery Engine', summary: 'Search real athletes and open shareable profiles.' },
+  { id: 'profile', label: 'Athlete Profile', eyebrow: 'Conversion Page', summary: 'Turn highlights and stats into opportunity.' },
 ];
 
 const SCORE_RING_PRIMARY = '#22d3ee';
 const SCORE_RING_SECONDARY = '#22c55e';
 const SCORE_RING_ACCENT_SPAN = 4;
 const MIN_TREND_BAR_HEIGHT = 18;
-const TREND_POINTS = [38, 54, 48, 70, 64, 79, 94];
-const ATHLETE_NAME = 'Maya Brooks';
+const TREND_POINTS = [32, 48, 57, 61, 73, 84, 96];
+
+const athleteProPriceId = import.meta.env.VITE_STRIPE_ATHLETE_PRO_PRICE_ID;
+const coachProPriceId = import.meta.env.VITE_STRIPE_COACH_PRO_PRICE_ID;
+const recruiterProPriceId = import.meta.env.VITE_STRIPE_RECRUITER_PRO_PRICE_ID;
+const defaultAthleteId = import.meta.env.VITE_DEFAULT_ATHLETE_ID?.trim() || null;
+const activeSubscriptions = new Set<string>(
+  (import.meta.env.VITE_ACTIVE_SUBSCRIPTIONS ?? '')
+    .split(',')
+    .map((value: string) => value.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+const subscriptionPlans: SubscriptionPlan[] = [
+  {
+    key: 'athlete',
+    label: 'Athlete Pro',
+    price: '$12 / month',
+    description: 'Unlock highlight generation and premium profile sharing.',
+    priceId: athleteProPriceId,
+  },
+  {
+    key: 'coach',
+    label: 'Coach Pro',
+    price: '$199 / month',
+    description: 'Enable advanced decision support and live game workflows.',
+    priceId: coachProPriceId,
+  },
+  {
+    key: 'recruiter',
+    label: 'Recruiter Pro',
+    price: '$149 / month',
+    description: 'Save prospects, compare athletes, and streamline discovery.',
+    priceId: recruiterProPriceId,
+  },
+];
 
 function getInitials(name: string) {
+  if (!name.trim()) return '';
   return name
     .split(' ')
     .filter(Boolean)
@@ -123,47 +112,306 @@ function getInitials(name: string) {
     .join('');
 }
 
+function toWebSocketUrl(baseUrl: string) {
+  const normalized = baseUrl.trim().replace(/\/$/, '');
+  if (normalized.startsWith('ws://') || normalized.startsWith('wss://')) {
+    return `${normalized}/live`;
+  }
+  return `${normalized.replace(/^http/, 'ws')}/live`;
+}
+
+function formatMetric(value?: number | null) {
+  return typeof value === 'number' ? String(value) : '—';
+}
+
+function formatScore(value?: number | null) {
+  return typeof value === 'number' ? value.toFixed(0) : '—';
+}
+
+function calculateEfficiency(stats?: StatsRecord | null) {
+  if (!stats || !stats.spikes) return 0;
+  return Math.max(0, ((stats.spikes - stats.errors) / stats.spikes) * 100);
+}
+
+function averageScore(athletes: AthleteRecord[]) {
+  const scores = athletes.map((athlete) => athlete.score).filter((score): score is number => typeof score === 'number');
+  if (!scores.length) return null;
+  return Math.round(scores.reduce((total, score) => total + score, 0) / scores.length);
+}
+
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
+  const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(defaultAthleteId);
+  const [selectedAthlete, setSelectedAthlete] = useState<AthleteRecord | null>(null);
+  const [selectedStats, setSelectedStats] = useState<StatsRecord | null>(null);
+  const [athletes, setAthletes] = useState<AthleteRecord[]>([]);
+  const [rosterStats, setRosterStats] = useState<StatsRecord[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
+  const [loadingRoster, setLoadingRoster] = useState(true);
+  const [loadingAthlete, setLoadingAthlete] = useState(true);
+  const [liveSnapshot, setLiveSnapshot] = useState<LiveSnapshot>({
+    alerts: [],
+    insights: [],
+    stats: {},
+    status: import.meta.env.VITE_AI_PIPELINE_URL ? 'connecting' : 'disabled',
+  });
+
+  const supabaseReady = isSupabaseConfigured();
+  const aiPipelineUrl = import.meta.env.VITE_AI_PIPELINE_URL;
+  const athleteSubscriptionActive = activeSubscriptions.has('athlete');
+  const coachSubscriptionActive = activeSubscriptions.has('coach');
+  const recruiterSubscriptionActive = activeSubscriptions.has('recruiter');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoster() {
+      setLoadingRoster(true);
+      setDataError(null);
+
+      try {
+        const roster = await getAthletes(searchQuery);
+        const stats = await getStatsForAthletes(roster.map((athlete) => athlete.id));
+
+        if (cancelled) return;
+
+        setAthletes(roster);
+        setRosterStats(stats);
+      } catch (error) {
+        if (cancelled) return;
+        setDataError(error instanceof Error ? error.message : 'Unable to load athlete roster.');
+        setAthletes([]);
+        setRosterStats([]);
+      } finally {
+        if (!cancelled) {
+          setLoadingRoster(false);
+        }
+      }
+    }
+
+    void loadRoster();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!athletes.length) {
+      setSelectedAthleteId(null);
+      return;
+    }
+
+    if (!selectedAthleteId || !athletes.some((athlete) => athlete.id === selectedAthleteId)) {
+      setSelectedAthleteId(athletes[0].id);
+    }
+  }, [athletes, selectedAthleteId]);
+
+  useEffect(() => {
+    if (!selectedAthleteId) {
+      setSelectedAthlete(null);
+      setSelectedStats(null);
+      setLoadingAthlete(false);
+      return;
+    }
+
+    const athleteId: string = selectedAthleteId;
+
+    let cancelled = false;
+
+    async function loadAthlete() {
+      setLoadingAthlete(true);
+
+      try {
+        const [athlete, stats] = await Promise.all([getAthlete(athleteId), getStats(athleteId)]);
+        if (cancelled) return;
+
+        setSelectedAthlete(athlete);
+        setSelectedStats(stats);
+      } catch (error) {
+        if (cancelled) return;
+        setDataError(error instanceof Error ? error.message : 'Unable to load athlete record.');
+        setSelectedAthlete(null);
+        setSelectedStats(null);
+      } finally {
+        if (!cancelled) {
+          setLoadingAthlete(false);
+        }
+      }
+    }
+
+    void loadAthlete();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAthleteId]);
+
+  useEffect(() => {
+    if (!aiPipelineUrl) return;
+
+    const socket = new WebSocket(toWebSocketUrl(aiPipelineUrl));
+
+    socket.addEventListener('open', () => {
+      setLiveSnapshot((current) => ({ ...current, status: 'connected' }));
+    });
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data) as Partial<LiveSnapshot>;
+        setLiveSnapshot({
+          alerts: payload.alerts ?? [],
+          insights: payload.insights ?? [],
+          stats: payload.stats ?? {},
+          status: 'connected',
+        });
+      } catch {
+        setLiveSnapshot((current) => ({ ...current, status: 'error' }));
+      }
+    });
+
+    socket.addEventListener('error', () => {
+      setLiveSnapshot((current) => ({ ...current, status: 'error' }));
+    });
+
+    socket.addEventListener('close', () => {
+      setLiveSnapshot((current) => ({
+        ...current,
+        status: current.status === 'error' ? 'error' : 'connecting',
+      }));
+    });
+
+    return () => {
+      socket.close();
+    };
+  }, [aiPipelineUrl]);
+
+  const rosterStatsByAthlete = useMemo(
+    () => new Map(rosterStats.map((stats) => [stats.athlete_id, stats])),
+    [rosterStats],
+  );
+
+  const averageTeamScore = useMemo(() => averageScore(athletes), [athletes]);
+
+  const playerRows = useMemo(
+    () =>
+      athletes.map((athlete) => {
+        const stats = rosterStatsByAthlete.get(athlete.id);
+        return {
+          id: athlete.id,
+          name: athlete.name,
+          spikes: stats?.spikes ?? 0,
+          sets: stats?.sets ?? 0,
+          serves: stats?.serves ?? 0,
+          errors: stats?.errors ?? 0,
+          efficiency: stats ? `${calculateEfficiency(stats).toFixed(0)}%` : '—',
+          score: athlete.score ?? 0,
+        };
+      }),
+    [athletes, rosterStatsByAthlete],
+  );
+
+  const featuredProspects = useMemo(() => athletes.slice(0, 3), [athletes]);
+  const aiInsights = liveSnapshot.insights.length
+    ? liveSnapshot.insights
+    : ['AI insights will stream here after the pipeline connects.', 'Configure VITE_AI_PIPELINE_URL to enable live recommendations.'];
+
+  const coachGamePlan = useMemo(() => {
+    const topAthlete = [...playerRows].sort((left, right) => right.score - left.score)[0];
+    const highestPressureServer = [...playerRows].sort((left, right) => right.serves - left.serves)[0];
+
+    return [
+      topAthlete ? `Feature ${topAthlete.name} early; current score ${topAthlete.score}.` : 'Load athlete production data to generate a game plan.',
+      highestPressureServer ? `Lean on ${highestPressureServer.name} from the service line.` : 'Service pressure plan will appear once stats sync.',
+      liveSnapshot.alerts[0] ?? 'Live AI alerts will surface during matches.',
+    ];
+  }, [liveSnapshot.alerts, playerRows]);
+
+  const athleteHighlights = selectedAthlete?.highlight_url ? [selectedAthlete.highlight_url] : [];
+  const latestStatSummary = selectedStats
+    ? [
+        `${selectedStats.spikes} spikes logged by the AI pipeline`,
+        `${selectedStats.sets} sets tracked`,
+        `${selectedStats.serves} serves with ${selectedStats.errors} errors`,
+      ]
+    : ['No stat row has been saved for this athlete yet.'];
+
+  const pipelineStatus = [
+    supabaseReady ? 'Supabase connected for live athlete records.' : 'Configure Supabase env vars to load live athlete records.',
+    aiPipelineUrl ? 'AI websocket endpoint configured for live insights.' : 'Add VITE_AI_PIPELINE_URL to stream live game insights.',
+    athleteHighlights.length ? 'Highlight clip available from the AI pipeline.' : 'The AI pipeline has not saved a highlight URL yet.',
+  ];
+
+  async function handleSubscribe(plan: SubscriptionPlan) {
+    try {
+      setCheckoutMessage(null);
+      await subscribeToCheckout(plan.priceId);
+    } catch (error) {
+      setCheckoutMessage(error instanceof Error ? error.message : 'Unable to start checkout.');
+    }
+  }
+
+  function openRecruiterProfile(athleteId: string) {
+    setSelectedAthleteId(athleteId);
+    setActiveScreen('profile');
+  }
 
   return (
     <div className="min-h-screen bg-[#050816] text-slate-50">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(34,197,94,0.14),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.88),_rgba(2,6,23,1))]" />
       <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <header className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/70 p-6 shadow-2xl shadow-black/30 backdrop-blur">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
-                PBTAPP
-                <span className="text-xs tracking-[0.24em] text-emerald-300">Performance • Exposure • Decisions</span>
-              </div>
-              <div className="space-y-3">
-                <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Connected dashboards for athletes, coaches, recruiters, and live match decisions.
-                </h1>
-                <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
-                  A premium dark-mode product concept that flows from athlete performance to coach strategy to recruiter discovery,
-                  then converts with a shareable athlete profile.
-                </p>
-              </div>
-              <ul className="flex flex-wrap gap-2" aria-label="Connected product flow highlights">
-                {['Athlete generates highlights', 'Coach wins with insight', 'Recruiter finds talent', 'Profile converts opportunity'].map((item) => (
-                  <li
-                    key={item}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
+          <div className="flex flex-col gap-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
+              PBTAPP
+              <span className="text-xs tracking-[0.24em] text-emerald-300">Supabase • AI pipeline • subscriptions</span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[380px]">
-              <StatCard label="Primary flows" value="4" detail="Athlete, coach, recruiter, profile" />
-              <StatCard label="Live decisions" value="Now" detail="Voice + alerts + AI insights" />
-              <StatCard label="Design language" value="Dark" detail="Neon green and electric blue accents" />
+
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+              <div className="max-w-3xl space-y-4">
+                <div className="space-y-3">
+                  <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+                    Live athlete data, AI-generated highlights, and subscription-ready dashboards.
+                  </h1>
+                  <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
+                    This app now reads athletes and stat rows from Supabase, listens for live AI pipeline updates, and exposes Stripe-powered upgrade paths for premium workflows.
+                  </p>
+                </div>
+
+                <ul className="flex flex-wrap gap-2" aria-label="Connected product flow highlights">
+                  {['Real athletes', 'Real stats', 'AI highlights', 'Monetized access'].map((item) => (
+                    <li key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[380px]">
+                <StatCard label="Roster loaded" value={loadingRoster ? '...' : String(athletes.length)} detail="Supabase athlete rows" />
+                <StatCard
+                  label="Live pipeline"
+                  value={liveSnapshot.status === 'connected' ? 'On' : liveSnapshot.status === 'disabled' ? 'Off' : '...'}
+                  detail="AI websocket health"
+                />
+                <StatCard label="Subscriptions" value={[athleteSubscriptionActive, coachSubscriptionActive, recruiterSubscriptionActive].filter(Boolean).length.toString()} detail="Unlocked premium roles" />
+              </div>
             </div>
           </div>
         </header>
+
+        {!supabaseReady ? (
+          <NoticeBanner
+            icon={<AlertCircle className="h-4 w-4" />}
+            tone="amber"
+            message="Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to load live athletes and stats."
+          />
+        ) : null}
+
+        {dataError ? <NoticeBanner icon={<AlertCircle className="h-4 w-4" />} tone="rose" message={dataError} /> : null}
+        {checkoutMessage ? <NoticeBanner icon={<AlertCircle className="h-4 w-4" />} tone="rose" message={checkoutMessage} /> : null}
 
         <section className="rounded-[28px] border border-white/10 bg-slate-950/70 p-3 shadow-2xl shadow-black/20 backdrop-blur">
           <div className="grid gap-3 lg:grid-cols-5">
@@ -180,7 +428,7 @@ export default function App() {
                       : 'border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]'
                   }`}
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-300">{screen.eyebrow}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">{screen.eyebrow}</p>
                   <h2 className="mt-2 text-lg font-semibold text-white">{screen.label}</h2>
                   <p className="mt-2 text-sm text-slate-400">{screen.summary}</p>
                 </button>
@@ -189,60 +437,129 @@ export default function App() {
           </div>
         </section>
 
-        {activeScreen === 'athlete' ? <AthleteDashboard onOpenProfile={() => setActiveScreen('profile')} /> : null}
-        {activeScreen === 'coach' ? <CoachDashboard onEnterLiveMode={() => setActiveScreen('live')} /> : null}
-        {activeScreen === 'live' ? <LiveGameMode /> : null}
-        {activeScreen === 'recruiter' ? <RecruiterDashboard onOpenProfile={() => setActiveScreen('profile')} /> : null}
-        {activeScreen === 'profile' ? <AthleteProfile /> : null}
+        {activeScreen === 'athlete' ? (
+          <AthleteDashboard
+            athlete={selectedAthlete}
+            stats={selectedStats}
+            loading={loadingAthlete}
+            onOpenProfile={() => setActiveScreen('profile')}
+            onPrimaryAction={() => {
+              if (athleteSubscriptionActive && selectedAthlete?.highlight_url) {
+                window.open(selectedAthlete.highlight_url, '_blank', 'noopener,noreferrer');
+                return;
+              }
+
+              void handleSubscribe(subscriptionPlans[0]);
+            }}
+            subscriptionActive={athleteSubscriptionActive}
+            highlights={athleteHighlights}
+            latestStatSummary={latestStatSummary}
+            pipelineStatus={pipelineStatus}
+          />
+        ) : null}
+
+        {activeScreen === 'coach' ? (
+          <CoachDashboard
+            onEnterLiveMode={() => setActiveScreen('live')}
+            players={playerRows}
+            performance={averageTeamScore}
+            insights={aiInsights.slice(0, 2)}
+            gamePlan={coachGamePlan}
+            subscriptionActive={coachSubscriptionActive}
+            onUnlock={() => void handleSubscribe(subscriptionPlans[1])}
+          />
+        ) : null}
+
+        {activeScreen === 'live' ? (
+          <LiveGameMode liveSnapshot={liveSnapshot} subscriptionActive={coachSubscriptionActive} onUnlock={() => void handleSubscribe(subscriptionPlans[1])} />
+        ) : null}
+
+        {activeScreen === 'recruiter' ? (
+          <RecruiterDashboard
+            athletes={athletes}
+            loading={loadingRoster}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onOpenProfile={openRecruiterProfile}
+            savedProspects={featuredProspects}
+            subscriptionActive={recruiterSubscriptionActive}
+            onUnlock={() => void handleSubscribe(subscriptionPlans[2])}
+          />
+        ) : null}
+
+        {activeScreen === 'profile' ? <AthleteProfile athlete={selectedAthlete} stats={selectedStats} loading={loadingAthlete} /> : null}
+
+        <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={activeSubscriptions} onSubscribe={handleSubscribe} />
       </div>
     </div>
   );
 }
 
-function AthleteDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
+function AthleteDashboard({
+  athlete,
+  stats,
+  loading,
+  onOpenProfile,
+  onPrimaryAction,
+  subscriptionActive,
+  highlights,
+  latestStatSummary,
+  pipelineStatus,
+}: {
+  athlete: AthleteRecord | null;
+  stats: StatsRecord | null;
+  loading: boolean;
+  onOpenProfile: () => void;
+  onPrimaryAction: () => void;
+  subscriptionActive: boolean;
+  highlights: string[];
+  latestStatSummary: string[];
+  pipelineStatus: string[];
+}) {
+  const score = athlete?.score ?? 0;
+  const efficiency = calculateEfficiency(stats);
+
   return (
     <div className="grid gap-6">
       <section className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
         <Panel>
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex gap-4">
-              <ProfileOrb initials={getInitials(ATHLETE_NAME)} accent="from-cyan-400 to-emerald-400" />
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-cyan-200">Athlete Dashboard</p>
-                  <h2 className="mt-2 text-3xl font-semibold text-white">{ATHLETE_NAME}</h2>
-                  <p className="mt-1 text-sm text-slate-400">Outside Hitter · Class of 2027 · Wave VC</p>
+          {loading ? (
+            <LoadingState label="Loading athlete profile..." />
+          ) : athlete ? (
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex gap-4">
+                <ProfileOrb initials={getInitials(athlete.name)} accent="from-cyan-400 to-emerald-400" />
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.3em] text-cyan-200">Athlete Dashboard</p>
+                    <h2 className="mt-2 text-3xl font-semibold text-white">{athlete.name}</h2>
+                    <p className="mt-1 text-sm text-slate-400">{athlete.position || 'Position pending'} · ID {athlete.id.slice(0, 8)}</p>
+                  </div>
+                  <ul className="flex flex-wrap gap-2" aria-label="Athlete status highlights">
+                    <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">Supabase record synced</li>
+                    <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                      {subscriptionActive ? 'Athlete Pro unlocked' : 'Athlete Pro locked'}
+                    </li>
+                    <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                      <time dateTime={new Date().toISOString()} aria-label="Data refreshed during this session">
+                        Session synced
+                      </time>
+                    </li>
+                  </ul>
                 </div>
-                <ul className="flex flex-wrap gap-2" aria-label="Athlete status highlights">
-                  <li
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300"
-                    aria-label="Recruiting status: open to recruiting"
-                  >
-                    Open to recruiting
-                  </li>
-                  <li
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300"
-                    aria-label="Ranking status: top 10 regional score"
-                  >
-                    Top 10 regional score
-                  </li>
-                  <li className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
-                    <time dateTime="2026-04-03T14:51:30Z" aria-label="Last updated 2 hours ago">
-                      Updated 2h ago
-                    </time>
-                  </li>
-                </ul>
               </div>
+              <button
+                type="button"
+                onClick={onOpenProfile}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/20"
+              >
+                <Share2 className="h-4 w-4" />
+                Share Profile
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onOpenProfile}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/20"
-            >
-              <Share2 className="h-4 w-4" />
-              Share Profile
-            </button>
-          </div>
+          ) : (
+            <EmptyState title="No athlete selected" detail="Add athlete rows in Supabase to populate this view." />
+          )}
         </Panel>
 
         <Panel>
@@ -250,19 +567,19 @@ function AthleteDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
             <div>
               <p className="text-sm uppercase tracking-[0.28em] text-emerald-300">Performance Score</p>
               <div className="mt-5 flex items-center gap-5">
-                <ScoreRing score={94} />
+                <ScoreRing score={score} />
                 <div>
-                  <p className="text-5xl font-semibold text-white">94</p>
+                  <p className="text-5xl font-semibold text-white">{formatScore(athlete?.score)}</p>
                   <p className="mt-2 max-w-[220px] text-sm text-slate-400">
-                    Elite attack efficiency, strong platform consistency, and rising exposure momentum.
+                    Real score sourced from the athlete row and updated by the AI pipeline save-results job.
                   </p>
                 </div>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricPill label="Kills / set" value="4.8" />
-              <MetricPill label="Pass rating" value="2.34" />
-              <MetricPill label="Recruiter saves" value="17" />
+              <MetricPill label="Spikes" value={formatMetric(stats?.spikes)} />
+              <MetricPill label="Serves" value={formatMetric(stats?.serves)} />
+              <MetricPill label="Efficiency" value={stats ? `${efficiency.toFixed(0)}%` : '—'} />
             </div>
           </div>
         </Panel>
@@ -270,39 +587,56 @@ function AthleteDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
         <PrimaryActionCard
-          icon={<Video className="h-5 w-5" />}
-          eyebrow="Primary CTA"
-          title="Generate Highlight Reel"
-          description="Create a shareable cut with best swings, key rotations, and recruiting-ready overlays."
-          action="Build reel"
+          icon={subscriptionActive ? <Video className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+          eyebrow={subscriptionActive ? 'Primary CTA' : 'Subscription Required'}
+          title={subscriptionActive ? 'Generate Highlight Reel' : 'Unlock Athlete Pro'}
+          description={
+            subscriptionActive
+              ? 'Open the AI-generated highlight URL saved to Supabase or trigger your premium highlight workflow.'
+              : 'Athlete Pro unlocks AI highlight generation, premium profile sharing, and exposure workflows.'
+          }
+          action={subscriptionActive ? 'Open highlight' : 'Subscribe'}
+          onAction={onPrimaryAction}
         />
         <InfoCard
           icon={<BarChart3 className="h-5 w-5" />}
           title="View Stats"
-          items={[
-            '18 kills · .412 efficiency',
-            '21 perfect passes',
-            '4 aces over last 3 matches',
-          ]}
+          items={latestStatSummary}
         />
         <InfoCard
           icon={<TrendingUp className="h-5 w-5" />}
-          title="Progress Trend"
-          items={['Performance score +6 in 30 days', 'Approach touch up 2 inches', 'Passing trending upward']}
+          title="Pipeline Status"
+          items={pipelineStatus}
           footer={<MiniTrendChart />}
         />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
-        <FeedCard title="Recent highlights" accent="text-cyan-200" items={athleteFeed.highlights} />
-        <FeedCard title="Recent games" accent="text-emerald-200" items={athleteFeed.games} />
-        <FeedCard title="Coach feedback" accent="text-blue-200" items={athleteFeed.feedback} />
+        <HighlightCard title="Recent highlights" highlights={highlights} />
+        <FeedCard title="Latest stat snapshot" accent="text-emerald-200" items={latestStatSummary} />
+        <FeedCard title="Integration status" accent="text-blue-200" items={pipelineStatus} />
       </section>
     </div>
   );
 }
 
-function CoachDashboard({ onEnterLiveMode }: { onEnterLiveMode: () => void }) {
+function CoachDashboard({
+  onEnterLiveMode,
+  players,
+  performance,
+  insights,
+  gamePlan,
+  subscriptionActive,
+  onUnlock,
+}: {
+  onEnterLiveMode: () => void;
+  players: Array<{ id: string; name: string; spikes: number; serves: number; errors: number; efficiency: string; score: number }>;
+  performance: number | null;
+  insights: string[];
+  gamePlan: string[];
+  subscriptionActive: boolean;
+  onUnlock: () => void;
+}) {
   return (
     <div className="grid gap-6">
       <section className="rounded-[32px] border border-white/10 bg-slate-950/70 p-6 shadow-2xl shadow-black/20 backdrop-blur">
@@ -310,16 +644,27 @@ function CoachDashboard({ onEnterLiveMode }: { onEnterLiveMode: () => void }) {
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-cyan-200">Coach / Team Dashboard</p>
             <h2 className="mt-2 text-3xl font-semibold text-white">Quantico Volleyball</h2>
-            <p className="mt-2 text-sm text-slate-400">Next opponent: Coast United · Saturday 7:00 PM · Regional semifinal</p>
+            <p className="mt-2 text-sm text-slate-400">Live roster metrics sourced from Supabase athlete and stats tables.</p>
           </div>
-          <button
-            type="button"
-            onClick={onEnterLiveMode}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
-          >
-            <Activity className="h-4 w-4" />
-            Enter Live Mode
-          </button>
+          {subscriptionActive ? (
+            <button
+              type="button"
+              onClick={onEnterLiveMode}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+            >
+              <Activity className="h-4 w-4" />
+              Enter Live Mode
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onUnlock}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/20"
+            >
+              <Lock className="h-4 w-4" />
+              Unlock Coach Pro
+            </button>
+          )}
         </div>
       </section>
 
@@ -327,26 +672,32 @@ function CoachDashboard({ onEnterLiveMode }: { onEnterLiveMode: () => void }) {
         <InsightCard
           icon={<Gauge className="h-5 w-5" />}
           title="Team Performance"
-          detail="Efficiency rating 0.348"
-          bullets={['Sideout rate 63%', 'Trend +8% over last 5 matches']}
+          detail={performance ? `Average athlete score ${performance}` : 'Waiting for live score data'}
+          bullets={[
+            `${players.length} roster entries loaded`,
+            `Top efficiency ${players[0]?.efficiency ?? '—'}`,
+          ]}
         />
         <InsightCard
           icon={<Target className="h-5 w-5" />}
           title="Opponent Insights"
-          detail="Coast United patterns"
-          bullets={['Hits cross-court 68%', 'Weak serve receive zone 5']}
+          detail="AI pipeline feed"
+          bullets={insights}
         />
         <InsightCard
           icon={<Shield className="h-5 w-5" />}
           title="Game Plan"
-          detail="Auto-generated prep"
-          bullets={['Block line on OH1', 'Serve zone 1 on rotation 4']}
+          detail="Derived from live production"
+          bullets={gamePlan}
         />
         <InsightCard
           icon={<Play className="h-5 w-5" />}
           title="Film + Highlights"
-          detail="Quick access"
-          bullets={['Last timeout clip stack', 'Scout reel with tagged tendencies']}
+          detail="AI clips"
+          bullets={[
+            'Athlete highlight URLs open from the profile screen.',
+            'Use Coach Pro to access live decision support during matches.',
+          ]}
         />
       </section>
 
@@ -357,9 +708,9 @@ function CoachDashboard({ onEnterLiveMode }: { onEnterLiveMode: () => void }) {
             <h3 className="mt-2 text-2xl font-semibold text-white">Sortable player stats table</h3>
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-            {['Sort: kills', 'Sort: errors', 'Sort: efficiency'].map((item) => (
+            {['Spikes', 'Serves', 'Errors', 'Efficiency'].map((item) => (
               <span key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                {item}
+                Sort: {item}
               </span>
             ))}
           </div>
@@ -370,20 +721,30 @@ function CoachDashboard({ onEnterLiveMode }: { onEnterLiveMode: () => void }) {
             <thead className="bg-white/[0.03] text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-medium">Player</th>
-                <th className="px-4 py-3 font-medium">Kills</th>
+                <th className="px-4 py-3 font-medium">Spikes</th>
+                <th className="px-4 py-3 font-medium">Serves</th>
                 <th className="px-4 py-3 font-medium">Errors</th>
                 <th className="px-4 py-3 font-medium">Efficiency</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/8 bg-slate-950/40">
-              {coachPlayers.map((player) => (
-                <tr key={player.name} className="text-slate-200">
-                  <td className="px-4 py-3 font-medium text-white">{player.name}</td>
-                  <td className="px-4 py-3">{player.kills}</td>
-                  <td className="px-4 py-3">{player.errors}</td>
-                  <td className="px-4 py-3 text-emerald-300">{player.efficiency}</td>
+              {players.length ? (
+                players.map((player) => (
+                  <tr key={player.id} className="text-slate-200">
+                    <td className="px-4 py-3 font-medium text-white">{player.name}</td>
+                    <td className="px-4 py-3">{player.spikes}</td>
+                    <td className="px-4 py-3">{player.serves}</td>
+                    <td className="px-4 py-3">{player.errors}</td>
+                    <td className="px-4 py-3 text-emerald-300">{player.efficiency}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="px-4 py-6 text-slate-400" colSpan={5}>
+                    Add athletes and stats in Supabase to populate the coach table.
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -392,9 +753,29 @@ function CoachDashboard({ onEnterLiveMode }: { onEnterLiveMode: () => void }) {
   );
 }
 
-function LiveGameMode() {
+function LiveGameMode({
+  liveSnapshot,
+  subscriptionActive,
+  onUnlock,
+}: {
+  liveSnapshot: LiveSnapshot;
+  subscriptionActive: boolean;
+  onUnlock: () => void;
+}) {
+  const liveStatsEntries = Object.entries(liveSnapshot.stats);
+
   return (
     <section className="rounded-[36px] border border-white/10 bg-slate-950/80 p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6">
+      {!subscriptionActive ? (
+        <NoticeBanner
+          icon={<Lock className="h-4 w-4" />}
+          tone="amber"
+          message="Coach Pro is required for live match mode. Unlock the subscription to activate in-game AI insights."
+          actionLabel="Unlock Coach Pro"
+          onAction={onUnlock}
+        />
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[0.78fr_1.5fr_0.82fr]">
         <Panel className="h-full">
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.28em] text-emerald-300">
@@ -402,7 +783,7 @@ function LiveGameMode() {
             AI Insights
           </div>
           <div className="mt-5 space-y-3">
-            {['Player 2 is cross-court heavy', 'Serve zone 5 now', 'Commit block if middle slides on 31'].map((item) => (
+            {(liveSnapshot.insights.length ? liveSnapshot.insights : ['Waiting for AI insight stream...']).map((item) => (
               <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
                 {item}
               </div>
@@ -417,14 +798,14 @@ function LiveGameMode() {
               <h2 className="mt-2 text-2xl font-semibold text-white">Tracking overlay</h2>
             </div>
             <span className="rounded-full border border-emerald-400/35 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-              LIVE · Set 4
+              {liveSnapshot.status === 'connected' ? 'LIVE' : liveSnapshot.status.toUpperCase()}
             </span>
           </div>
           <div className="mt-5 overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(145deg,_rgba(8,47,73,0.65),_rgba(15,23,42,0.92))] p-4">
             <div className="relative aspect-[16/10] rounded-[24px] border border-cyan-400/20 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.16),_rgba(2,6,23,0.95))]">
               <div className="absolute inset-x-6 top-6 flex items-center justify-between text-xs uppercase tracking-[0.25em] text-slate-300">
                 <span>Court vision</span>
-                <span>Latency 1.2s</span>
+                <span>{subscriptionActive ? 'AI websocket ready' : 'Locked'}</span>
               </div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 p-5 text-cyan-100">
@@ -432,10 +813,10 @@ function LiveGameMode() {
                 </div>
               </div>
               <div className="absolute left-[17%] top-[30%] rounded-full border border-emerald-400/50 bg-emerald-400/20 px-3 py-1 text-xs font-semibold text-emerald-100">
-                Zone 5 alert
+                {liveSnapshot.alerts[0] ?? 'Awaiting alert'}
               </div>
               <div className="absolute right-[18%] top-[42%] rounded-full border border-cyan-400/50 bg-cyan-400/20 px-3 py-1 text-xs font-semibold text-cyan-100">
-                Player 2 tendency
+                {liveSnapshot.insights[0] ?? 'Awaiting insight'}
               </div>
               <div className="absolute bottom-[16%] left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs text-slate-200">
                 Real-time overlay ready for in-game use
@@ -450,10 +831,13 @@ function LiveGameMode() {
             Live Stats
           </div>
           <div className="mt-5 space-y-4">
-            <LiveStat label="Touches" value="38" />
-            <LiveStat label="Spikes" value="17" />
-            <LiveStat label="Efficiency" value=".344" />
-            <LiveStat label="Serve runs" value="3" />
+            {liveStatsEntries.length ? (
+              liveStatsEntries.map(([label, value]) => <LiveStat key={label} label={label} value={String(value)} />)
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+                No live stat payload has been received yet.
+              </div>
+            )}
           </div>
         </Panel>
       </div>
@@ -464,10 +848,10 @@ function LiveGameMode() {
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
         >
           <Mic className="h-4 w-4" />
-          Voice Assistant On
+          Voice Assistant {subscriptionActive ? 'Ready' : 'Locked'}
         </button>
         <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm font-medium text-amber-100">
-          Priority alerts indicator: 2 active
+          Priority alerts indicator: {liveSnapshot.alerts.length}
         </div>
         <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-300">
           Minimal taps · Fast reading · Bench usable
@@ -477,7 +861,25 @@ function LiveGameMode() {
   );
 }
 
-function RecruiterDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
+function RecruiterDashboard({
+  athletes,
+  loading,
+  searchQuery,
+  onSearchChange,
+  onOpenProfile,
+  savedProspects,
+  subscriptionActive,
+  onUnlock,
+}: {
+  athletes: AthleteRecord[];
+  loading: boolean;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  onOpenProfile: (athleteId: string) => void;
+  savedProspects: AthleteRecord[];
+  subscriptionActive: boolean;
+  onUnlock: () => void;
+}) {
   return (
     <div className="grid gap-6 xl:grid-cols-[1.55fr_0.75fr]">
       <div className="grid gap-6">
@@ -485,15 +887,20 @@ function RecruiterDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Recruiter Dashboard</p>
-              <h2 className="mt-2 text-3xl font-semibold text-white">Discovery engine for top prospects</h2>
+              <h2 className="mt-2 text-3xl font-semibold text-white">Discovery engine for live prospects</h2>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-400">
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-400">
               <Search className="h-4 w-4 text-cyan-200" />
-              Search by name, position, club, or grad year
-            </div>
+              <input
+                value={searchQuery}
+                onChange={(event) => onSearchChange(event.target.value)}
+                className="bg-transparent outline-none placeholder:text-slate-500"
+                placeholder="Search name or position"
+              />
+            </label>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {['Height 5’10”+', 'Grad year 2026-2028', 'Ranking Top 25', 'Position: OH / MB / S'].map((filter) => (
+            {['Real Supabase roster', 'Search by athlete name', 'Highlight URL previews', 'Shareable profile routing'].map((filter) => (
               <span key={filter} className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-100">
                 {filter}
               </span>
@@ -502,42 +909,47 @@ function RecruiterDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
         </Panel>
 
         <section className="grid gap-4 md:grid-cols-2">
-          {athleteCards.map((athlete) => (
-            <button
-              key={athlete.name}
-              type="button"
-              onClick={onOpenProfile}
-              className="rounded-[28px] border border-white/10 bg-slate-950/70 p-5 text-left shadow-2xl shadow-black/20 transition hover:border-cyan-400/35 hover:bg-slate-900/80"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <ProfileOrb
-                    initials={getInitials(athlete.name)}
-                    accent="from-emerald-400 to-cyan-400"
-                    small
-                  />
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">{athlete.name}</h3>
-                    <p className="text-sm text-slate-400">{athlete.position} · {athlete.gradYear}</p>
+          {loading ? (
+            <Panel className="md:col-span-2">
+              <LoadingState label="Loading recruiter prospects..." />
+            </Panel>
+          ) : athletes.length ? (
+            athletes.map((athlete) => (
+              <button
+                key={athlete.id}
+                type="button"
+                onClick={() => onOpenProfile(athlete.id)}
+                className="rounded-[28px] border border-white/10 bg-slate-950/70 p-5 text-left shadow-2xl shadow-black/20 transition hover:border-cyan-400/35 hover:bg-slate-900/80"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <ProfileOrb initials={getInitials(athlete.name)} accent="from-emerald-400 to-cyan-400" small />
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">{athlete.name}</h3>
+                      <p className="text-sm text-slate-400">{athlete.position || 'Position pending'}</p>
+                    </div>
                   </div>
+                  <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                    Score {formatScore(athlete.score)}
+                  </span>
                 </div>
-                <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                  Score {athlete.score}
-                </span>
-              </div>
-              <div className="mt-4 rounded-[22px] border border-white/10 bg-[linear-gradient(135deg,_rgba(8,47,73,0.7),_rgba(22,101,52,0.25))] p-4">
-                <div className="flex aspect-[16/9] items-center justify-center rounded-[18px] border border-white/10 bg-slate-950/40 text-slate-300">
-                  <Play className="mr-2 h-4 w-4 text-cyan-200" />
-                  Thumbnail highlight
+                <div className="mt-4 rounded-[22px] border border-white/10 bg-[linear-gradient(135deg,_rgba(8,47,73,0.7),_rgba(22,101,52,0.25))] p-4">
+                  {athlete.highlight_url ? (
+                    <video src={athlete.highlight_url} controls className="aspect-[16/9] w-full rounded-[18px] border border-white/10 bg-slate-950/40" />
+                  ) : (
+                    <div className="flex aspect-[16/9] items-center justify-center rounded-[18px] border border-white/10 bg-slate-950/40 text-slate-300">
+                      <Play className="mr-2 h-4 w-4 text-cyan-200" />
+                      No highlight URL saved yet
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
-                <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">{athlete.height}</span>
-                <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">{athlete.ranking}</span>
-                <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">Verified metrics</span>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))
+          ) : (
+            <Panel className="md:col-span-2">
+              <EmptyState title="No prospects found" detail="Create athlete rows in Supabase or adjust your search query." />
+            </Panel>
+          )}
         </section>
       </div>
 
@@ -547,58 +959,103 @@ function RecruiterDashboard({ onOpenProfile }: { onOpenProfile: () => void }) {
           Saved prospects
         </div>
         <div className="mt-5 space-y-3">
-          {recruiterSaved.map((item) => (
-            <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
-              {item}
-            </div>
-          ))}
+          {savedProspects.length ? (
+            savedProspects.map((athlete) => (
+              <div key={athlete.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
+                {athlete.name} · {athlete.position || 'Position pending'} · Score {formatScore(athlete.score)}
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">No saved prospects yet.</div>
+          )}
         </div>
+
         <div className="mt-6 rounded-[24px] border border-cyan-400/20 bg-cyan-400/10 p-4">
           <p className="text-sm font-semibold text-cyan-100">Quick compare</p>
-          <p className="mt-2 text-sm text-slate-300">Compare score, touch, efficiency, and recent film activity side-by-side.</p>
+          <p className="mt-2 text-sm text-slate-300">
+            {subscriptionActive ? 'Recruiter Pro is active. Compare score, highlight availability, and production at a glance.' : 'Recruiter Pro unlocks saved prospects and compare workflows.'}
+          </p>
         </div>
+
+        {!subscriptionActive ? (
+          <button
+            type="button"
+            onClick={onUnlock}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/20"
+          >
+            <Lock className="h-4 w-4" />
+            Unlock Recruiter Pro
+          </button>
+        ) : null}
       </Panel>
     </div>
   );
 }
 
-function AthleteProfile() {
+function AthleteProfile({
+  athlete,
+  stats,
+  loading,
+}: {
+  athlete: AthleteRecord | null;
+  stats: StatsRecord | null;
+  loading: boolean;
+}) {
+  const statBreakdown = [
+    { label: 'Spikes', value: formatMetric(stats?.spikes) },
+    { label: 'Sets', value: formatMetric(stats?.sets) },
+    { label: 'Serves', value: formatMetric(stats?.serves) },
+    { label: 'Errors', value: formatMetric(stats?.errors) },
+  ];
+
   return (
     <div className="grid gap-6">
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Panel>
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex gap-4">
-              <ProfileOrb initials={getInitials(ATHLETE_NAME)} accent="from-cyan-400 via-blue-400 to-emerald-400" />
-              <div>
-                <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Shareable Athlete Profile</p>
-                <h2 className="mt-2 text-3xl font-semibold text-white">{ATHLETE_NAME}</h2>
-                <p className="mt-2 text-sm text-slate-400">OH · 2027 · 6′0″ · Wave VC · GPA 3.9 · NCAA ready measurables</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {['Verified testing', 'Recruiting ID 38194', 'Open evaluation window'].map((item) => (
-                    <span key={item} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-slate-300">
-                      {item}
-                    </span>
-                  ))}
+          {loading ? (
+            <LoadingState label="Loading athlete profile..." />
+          ) : athlete ? (
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex gap-4">
+                <ProfileOrb initials={getInitials(athlete.name)} accent="from-cyan-400 via-blue-400 to-emerald-400" />
+                <div>
+                  <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Shareable Athlete Profile</p>
+                  <h2 className="mt-2 text-3xl font-semibold text-white">{athlete.name}</h2>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {athlete.position || 'Position pending'} · Athlete ID {athlete.id.slice(0, 8)} · Score {formatScore(athlete.score)}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {['Supabase-backed profile', athlete.highlight_url ? 'AI highlight ready' : 'Highlight pending', stats ? 'Stats synced' : 'Stats pending'].map((item) => (
+                      <span key={item} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-slate-300">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+              >
+                Contact Athlete
+                <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
-            >
-              Contact Athlete
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
+          ) : (
+            <EmptyState title="No athlete selected" detail="Select an athlete from the recruiter or athlete dashboard to populate this page." />
+          )}
         </Panel>
 
         <Panel>
           <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(145deg,_rgba(8,47,73,0.65),_rgba(30,41,59,0.92))] p-4">
-            <div className="flex aspect-[16/9] items-center justify-center rounded-[22px] border border-white/10 bg-slate-950/50 text-slate-200">
-              <Play className="mr-2 h-5 w-5 text-cyan-200" />
-              Highlight video hero
-            </div>
+            {athlete?.highlight_url ? (
+              <video src={athlete.highlight_url} controls className="aspect-[16/9] w-full rounded-[22px] border border-white/10 bg-slate-950/50" />
+            ) : (
+              <div className="flex aspect-[16/9] items-center justify-center rounded-[22px] border border-white/10 bg-slate-950/50 text-slate-200">
+                <Play className="mr-2 h-5 w-5 text-cyan-200" />
+                Highlight video hero will appear when the AI pipeline saves a highlight URL.
+              </div>
+            )}
           </div>
         </Panel>
       </section>
@@ -610,7 +1067,7 @@ function AthleteProfile() {
             Measurable stats
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {profileBreakdown.map((item) => (
+            {statBreakdown.map((item) => (
               <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-sm text-slate-400">{item.label}</p>
                 <p className="mt-2 text-2xl font-semibold text-white">{item.value}</p>
@@ -628,9 +1085,9 @@ function AthleteProfile() {
             <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
               <p className="text-sm text-slate-400">Stats breakdown</p>
               <div className="mt-4 space-y-4">
-                <BarRow label="Attack efficiency" value={88} color="from-cyan-400 to-blue-500" />
-                <BarRow label="Serve pressure" value={79} color="from-emerald-400 to-lime-400" />
-                <BarRow label="Passing" value={83} color="from-violet-400 to-fuchsia-400" />
+                <BarRow label="Attack volume" value={Math.min(stats?.spikes ?? 0, 100)} color="from-cyan-400 to-blue-500" />
+                <BarRow label="Serve volume" value={Math.min(stats?.serves ?? 0, 100)} color="from-emerald-400 to-lime-400" />
+                <BarRow label="Efficiency" value={calculateEfficiency(stats)} color="from-violet-400 to-fuchsia-400" />
               </div>
             </div>
             <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
@@ -643,6 +1100,133 @@ function AthleteProfile() {
         </Panel>
       </section>
     </div>
+  );
+}
+
+function SubscriptionPanel({
+  plans,
+  activeSubscriptions,
+  onSubscribe,
+}: {
+  plans: SubscriptionPlan[];
+  activeSubscriptions: Set<string>;
+  onSubscribe: (plan: SubscriptionPlan) => void;
+}) {
+  return (
+    <Panel>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Monetization</p>
+          <h2 className="mt-2 text-2xl font-semibold text-white">Stripe subscription tiers</h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-400">
+            Checkout requests post to the configured checkout endpoint and redirect users into a Stripe subscription flow.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+          Active tiers: {[...activeSubscriptions].join(', ') || 'none'}
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        {plans.map((plan) => {
+          const isActive = activeSubscriptions.has(plan.key);
+          return (
+            <div key={plan.key} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-white">{plan.label}</p>
+                  <p className="mt-1 text-sm text-slate-400">{plan.price}</p>
+                </div>
+                {isActive ? <CheckCircle2 className="h-5 w-5 text-emerald-300" /> : <Lock className="h-5 w-5 text-slate-500" />}
+              </div>
+              <p className="mt-4 text-sm text-slate-300">{plan.description}</p>
+              <button
+                type="button"
+                onClick={() => onSubscribe(plan)}
+                disabled={!plan.priceId || isActive}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+              >
+                {isActive ? 'Unlocked' : plan.priceId ? 'Subscribe' : 'Missing price ID'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function NoticeBanner({
+  icon,
+  tone,
+  message,
+  actionLabel,
+  onAction,
+}: {
+  icon: ReactNode;
+  tone: 'amber' | 'rose';
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  const toneClass =
+    tone === 'amber'
+      ? 'border-amber-400/30 bg-amber-400/10 text-amber-100'
+      : 'border-rose-400/30 bg-rose-400/10 text-rose-100';
+
+  return (
+    <div className={`flex flex-col gap-3 rounded-[24px] border px-4 py-4 shadow-lg shadow-black/10 sm:flex-row sm:items-center sm:justify-between ${toneClass}`}>
+      <div className="flex items-center gap-2 text-sm">
+        {icon}
+        <span>{message}</span>
+      </div>
+      {actionLabel && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="rounded-xl border border-current/30 px-3 py-2 text-sm font-semibold"
+        >
+          {actionLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function LoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 text-sm text-slate-300">
+      <div className="h-3 w-3 animate-pulse rounded-full bg-cyan-300" />
+      {label}
+    </div>
+  );
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="rounded-[24px] border border-dashed border-white/15 bg-white/[0.02] p-6">
+      <p className="text-lg font-semibold text-white">{title}</p>
+      <p className="mt-2 text-sm text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
+function HighlightCard({ title, highlights }: { title: string; highlights: string[] }) {
+  return (
+    <Panel>
+      <h3 className="text-lg font-semibold text-cyan-200">{title}</h3>
+      <div className="mt-4 space-y-3">
+        {highlights.length ? (
+          highlights.map((highlight) => (
+            <video key={highlight} src={highlight} controls className="aspect-video w-full rounded-2xl border border-white/10 bg-slate-950/60" />
+          ))
+        ) : (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+            The AI pipeline has not saved a highlight URL for this athlete yet.
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 }
 
@@ -676,7 +1260,7 @@ function ScoreRing({ score }: { score: number }) {
       }}
     >
       <div className="flex h-[104px] w-[104px] items-center justify-center rounded-full border border-white/8 bg-slate-950 text-3xl font-semibold text-white">
-        {score}
+        {formatScore(score)}
       </div>
     </div>
   );
@@ -697,12 +1281,14 @@ function PrimaryActionCard({
   title,
   description,
   action,
+  onAction,
 }: {
   icon: ReactNode;
   eyebrow: string;
   title: string;
   description: string;
   action: string;
+  onAction: () => void;
 }) {
   return (
     <Panel>
@@ -717,6 +1303,7 @@ function PrimaryActionCard({
         </div>
         <button
           type="button"
+          onClick={onAction}
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
         >
           {action}
@@ -804,7 +1391,7 @@ function LiveStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <p className="text-sm text-slate-400">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-white">{value}</p>
+      <p className="mt-2 text-3xl font-semibold capitalize text-white">{value}</p>
     </div>
   );
 }
@@ -814,10 +1401,10 @@ function BarRow({ label, value, color }: { label: string; value: number; color: 
     <div>
       <div className="mb-2 flex items-center justify-between text-sm">
         <span className="text-slate-300">{label}</span>
-        <span className="font-medium text-white">{value}</span>
+        <span className="font-medium text-white">{value.toFixed(0)}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-white/8">
-        <div className={`h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${value}%` }} />
+        <div className={`h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${Math.min(value, 100)}%` }} />
       </div>
     </div>
   );
@@ -828,7 +1415,7 @@ function MiniTrendChart({ tall = false }: { tall?: boolean }) {
     <div className={`rounded-[24px] border border-white/10 bg-white/[0.03] p-4 ${tall ? 'h-[220px]' : ''}`}>
       <div className="flex h-full items-end gap-3">
         {TREND_POINTS.map((value, index) => (
-          <div key={`trend-${index + 1}-${value}`} className="flex flex-1 flex-col items-center gap-2">
+          <div key={`trend-${index}-${value}`} className="flex flex-1 flex-col items-center gap-2">
             <div
               className="w-full rounded-full bg-gradient-to-t from-cyan-400 via-blue-500 to-emerald-400"
               style={{ height: `${Math.max(value, MIN_TREND_BAR_HEIGHT)}%` }}
