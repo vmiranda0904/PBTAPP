@@ -64,8 +64,8 @@ create table if not exists jobs (
   pdf_report_url text
 );
 
+alter table if exists jobs add column if not exists progress int not null default 0;
+
 create index if not exists jobs_user_id_idx on jobs (user_id);
 create index if not exists jobs_team_id_idx on jobs (team_id);
 create index if not exists jobs_status_idx on jobs (status);
-
-alter table if exists jobs add column if not exists progress int not null default 0;

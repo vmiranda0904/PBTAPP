@@ -132,6 +132,11 @@ type AiRequestOwner = {
 
 const aiEngineUrl = import.meta.env.VITE_AI_ENGINE_URL?.trim() ?? '';
 
+export function clampJobProgress(value: number | null | undefined) {
+  if (!isNumber(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function requireAiEngineUrl() {
   if (!aiEngineUrl) {
     throw new Error('Set VITE_AI_ENGINE_URL to enable AI video job uploads.');
@@ -266,7 +271,7 @@ function normalizeJob(job: unknown, owner?: AiRequestOwner): AiJob {
     user_id: isString(job.user_id) ? job.user_id : undefined,
     team_id: isString(job.team_id) ? job.team_id : undefined,
     status: ['queued', 'processing', 'completed', 'failed'].includes(job.status) ? (job.status as AiJobStatus) : 'failed',
-    progress: isNumber(job.progress) ? Math.max(0, Math.min(100, Math.round(job.progress))) : 0,
+    progress: clampJobProgress(job.progress),
     processing_stage: isString(job.processing_stage) ? job.processing_stage : undefined,
     sport: job.sport,
     team_name: job.team_name,

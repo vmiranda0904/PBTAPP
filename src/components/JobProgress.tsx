@@ -1,3 +1,4 @@
+import { clampJobProgress } from '../lib/aiEngineService';
 import type { AiJob } from '../lib/aiEngineService';
 
 type JobProgressProps = {
@@ -5,7 +6,7 @@ type JobProgressProps = {
 };
 
 export default function JobProgress({ job }: JobProgressProps) {
-  const progress = Math.max(0, Math.min(100, job.progress));
+  const progress = clampJobProgress(job.progress);
   const message = getProgressMessage(job);
 
   return (
@@ -37,7 +38,7 @@ function getProgressMessage(job: AiJob) {
   }
 
   if (job.status === 'failed') {
-    return job.error ?? 'Processing stopped before the report was generated.';
+    return job.error ?? 'Processing failed. Please try uploading again or contact support if the issue persists.';
   }
 
   const stageMessages: Record<string, string> = {

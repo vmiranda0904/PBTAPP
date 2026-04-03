@@ -29,6 +29,13 @@ NORMAL_RESULT_WEIGHTS = [0.42, 0.24, 0.16, 0.1, 0.08]
 HIGH_PRESSURE_RESULT_WEIGHTS = [0.28, 0.22, 0.3, 0.08, 0.12]
 MIN_TENDENCY_PCT = 0.15
 RIGHT_PCT_ADJUSTMENT_FACTOR = 2
+PROGRESS_PROCESSING_STARTED = 20
+PROGRESS_READING_STORAGE = 30
+PROGRESS_CACHE_LOOKUP = 45
+PROGRESS_ANALYZING = 65
+PROGRESS_BUILDING_REPORT = 80
+PROGRESS_RENDERING_ARTIFACTS = 90
+PROGRESS_COMPLETE = 100
 
 
 def _utcnow() -> datetime:
@@ -175,7 +182,7 @@ def _complete_from_cached_job(job: VideoJob, cached_job: VideoJob, video_hash: s
     job.file_size_bytes = file_size
     job.report = cached_report
     job.status = 'completed'
-    job.progress = 100
+    job.progress = PROGRESS_COMPLETE
     job.processing_stage = 'completed_from_cache'
     job.video_url = cached_job.video_url or job.video_url
     job.report_storage_path = cached_job.report_storage_path
@@ -194,7 +201,7 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
     overall_start = time.perf_counter()
     timings = job.timings_ms or StageTimings()
     job.status = 'processing'
-    job.progress = max(job.progress, 20)
+    job.progress = max(job.progress, PROGRESS_PROCESSING_STARTED)
     job.processing_stage = 'processing_started'
     job.retry_count = attempt
     if not job.started_at:
@@ -203,7 +210,7 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
     log_event('job_processing_started', job_id=job.id, attempt=attempt, storage_path=job.storage_path, video_url=job.video_url)
 
     ingest_start = time.perf_counter()
-    job.progress = max(job.progress, 30)
+    job.progress = max(job.progress, PROGRESS_READING_STORAGE)
     job.processing_stage = 'reading_storage'
     video_bytes = _read_video_payload(job)
     timings.ingest_ms = round((time.perf_counter() - ingest_start) * 1000, 2)
@@ -215,7 +222,7 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
     timings.hash_ms = round((time.perf_counter() - hash_start) * 1000, 2)
     job.video_hash = video_hash
     job.file_size_bytes = file_size
-    job.progress = max(job.progress, 45)
+    job.progress = max(job.progress, PROGRESS_CACHE_LOOKUP)
     job.processing_stage = 'cache_lookup'
     job = save_job(job)
 
@@ -243,7 +250,7 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
     timings.decode_scan_ms = round((time.perf_counter() - decode_start) * 1000, 2)
 
     detection_start = time.perf_counter()
-    job.progress = max(job.progress, 65)
+    job.progress = max(job.progress, PROGRESS_ANALYZING)
     device = detect_device()
     timings.selective_detection_ms = round((time.perf_counter() - detection_start) * 1000, 2)
 
@@ -286,7 +293,7 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
     timings.gameplan_ms = timings.tendency_ms
 
     stats_start = time.perf_counter()
-    job.progress = max(job.progress, 80)
+    job.progress = max(job.progress, PROGRESS_BUILDING_REPORT)
     report = ProcessingReport(
         summary='Coach scouting preview generated opponent tendencies, weakness flags, heatmap bins, and an actionable game plan from the current AI engine pipeline.',
         sport=job.sport,
@@ -328,7 +335,7 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
     timings.stats_ms = round((time.perf_counter() - stats_start) * 1000, 2)
 
     render_start = time.perf_counter()
-    job.progress = max(job.progress, 90)
+    job.progress = max(job.progress, PROGRESS_RENDERING_ARTIFACTS)
     report_storage_path = f'reports/{job.id}.json'
     pdf_storage_path = f'reports/{job.id}.pdf'
     report_json_bytes = report.model_dump_json(indent=2).encode('utf-8')
@@ -346,7 +353,7 @@ def _run_processing(job: VideoJob, attempt: int) -> VideoJob:
 
     job.report = report
     job.status = 'completed'
-    job.progress = 100
+    job.progress = PROGRESS_COMPLETE
     job.processing_stage = 'completed'
     job.report_storage_path = report_storage_path
     job.pdf_storage_path = pdf_storage_path
