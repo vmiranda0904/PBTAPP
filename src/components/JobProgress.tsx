@@ -43,6 +43,7 @@ function getProgressMessage(job: AiJob) {
   const stageMessages: Record<string, string> = {
     accepted: 'Upload accepted and preparing the job.',
     uploaded: 'Video uploaded successfully.',
+    upload_failed: 'Upload failed before processing could begin.',
     queued: 'Waiting for an available worker.',
     retry_scheduled: 'Retrying after a temporary processing issue.',
     processing_started: 'Processing started.',

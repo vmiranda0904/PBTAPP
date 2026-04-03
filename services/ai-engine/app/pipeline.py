@@ -394,7 +394,6 @@ def process_video_job(job_id: str) -> None:
                 continue
 
             current_job.status = 'failed'
-            current_job.progress = min(current_job.progress, 95)
             current_job.processing_stage = 'failed'
             save_job(current_job)
             log_exception('job_processing_failed', job_id=job_id, attempt=attempt + 1)

@@ -216,7 +216,6 @@ async def create_job(
         log_event('job_created', job_id=job.id, user_id=owner_user_id, team_id=owner_team_id, file_size_bytes=file_size)
     except Exception as exc:
         job.status = 'failed'
-        job.progress = min(job.progress, 95)
         job.processing_stage = 'upload_failed'
         job.error = str(exc)
         job = save_job(job)
