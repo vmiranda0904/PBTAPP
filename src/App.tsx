@@ -580,7 +580,7 @@ export default function App() {
       return;
     }
 
-    setCheckoutMessage('No highlight URL is available for this athlete yet.');
+    setCheckoutMessage("This athlete's highlight video is still being processed. Check back soon.");
   }
 
   function handleOnboardingComplete(profile: OnboardingProfile) {
