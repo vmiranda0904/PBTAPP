@@ -579,7 +579,7 @@ export default function App() {
       return;
     }
 
-    setCheckoutMessage('The highlight video is still being processed. Check back soon.');
+    setCheckoutMessage('The highlight video is still being processed in the AI pipeline. Check the AI video panel for job status.');
   }
 
   function handleOnboardingComplete(profile: OnboardingProfile) {
