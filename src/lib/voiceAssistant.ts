@@ -1,6 +1,8 @@
 import type { PriorityAlert } from './aiEngineService';
 
 let lastSpokenAt = 0;
+const SPEECH_RATE = 1.05;
+const SPEECH_PITCH = 0.9;
 
 export function speak(text: string) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -8,8 +10,8 @@ export function speak(text: string) {
   }
 
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 1.05;
-  utterance.pitch = 0.9;
+  utterance.rate = SPEECH_RATE;
+  utterance.pitch = SPEECH_PITCH;
   window.speechSynthesis.speak(utterance);
   return true;
 }

@@ -10,6 +10,9 @@ from .weakness_engine import detect_weakness
 
 GRID_SIZE = 3
 MAX_BIN_INDEX = GRID_SIZE - 1
+HIGH_KILL_RATE_THRESHOLD = 0.5
+LEFT_LANE_STRENGTH_THRESHOLD = 0.5
+LOW_PRESSURE_RATE_THRESHOLD = 0.3
 
 
 def _heatmap_for_events(events: Iterable[PlayEvent]) -> list[HeatmapCell]:
@@ -47,11 +50,11 @@ def build_scouting_report(team_name: str, events: list[PlayEvent]) -> tuple[Oppo
         weakness = weaknesses.get(player_id)
         strengths: list[str] = []
 
-        if float(data['kill_rate']) > 0.5:
+        if float(data['kill_rate']) > HIGH_KILL_RATE_THRESHOLD:
             strengths.append('Converts a high share of attack attempts into points')
-        if float(data['left_pct']) > 0.5:
+        if float(data['left_pct']) > LEFT_LANE_STRENGTH_THRESHOLD:
             strengths.append('Creates repeatable value out of the left-side lane')
-        if float(data['under_pressure_rate']) < 0.3:
+        if float(data['under_pressure_rate']) < LOW_PRESSURE_RATE_THRESHOLD:
             strengths.append('Stays composed in high-pressure sequences')
 
         if weakness:

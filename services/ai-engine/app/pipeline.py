@@ -25,6 +25,8 @@ PRESSURE_WEIGHTS = [0.25, 0.45, 0.30]
 PLAY_TYPE_WEIGHTS = [0.65, 0.2, 0.15]
 NORMAL_RESULT_WEIGHTS = [0.42, 0.24, 0.16, 0.1, 0.08]
 HIGH_PRESSURE_RESULT_WEIGHTS = [0.28, 0.22, 0.3, 0.08, 0.12]
+MIN_TENDENCY_PCT = 0.15
+RIGHT_PCT_ADJUSTMENT_FACTOR = 2
 
 
 def _sha256_for_file(file_path: Path) -> tuple[str, int]:
@@ -121,8 +123,8 @@ def _build_matchup_teams(
             {
                 'id': f'Prime-{player_id}',
                 'tendencies': {
-                    'left_pct': round(max(0.15, 1 - summary.right_pct), 2),
-                    'right_pct': round(max(0.15, summary.right_pct / 2), 2),
+                    'left_pct': round(max(MIN_TENDENCY_PCT, 1 - summary.right_pct), 2),
+                    'right_pct': round(max(MIN_TENDENCY_PCT, summary.right_pct / RIGHT_PCT_ADJUSTMENT_FACTOR), 2),
                 },
                 'stats': {
                     'spikes': player_stats.get(player_id, {}).get('spikes', 0) + 3,
@@ -186,7 +188,7 @@ def process_video_job(job: VideoJob, uploaded_path: Path) -> None:
         decode_start = time.perf_counter()
         events = _generate_demo_events(video_hash)
         observability = {
-            'frame_count_processed': len(events) * PIPELINE_DEFAULTS.frame_skip,
+            'estimated_total_frames': len(events) * PIPELINE_DEFAULTS.frame_skip,
             'effective_skip_ratio': PIPELINE_DEFAULTS.frame_skip,
             'frame_skip': PIPELINE_DEFAULTS.frame_skip,
             'detection_interval': PIPELINE_DEFAULTS.detection_interval,

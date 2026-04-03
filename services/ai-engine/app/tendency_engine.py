@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+LEFT_ZONE_MAX = 0.33
+MIDDLE_ZONE_MAX = 0.66
+
 
 class TendencyEngine:
     def __init__(self) -> None:
@@ -19,9 +22,9 @@ class TendencyEngine:
             if not spikes:
                 continue
 
-            left = sum(1 for event in spikes if event['end_position'][0] < 0.33)
-            middle = sum(1 for event in spikes if 0.33 <= event['end_position'][0] < 0.66)
-            right = sum(1 for event in spikes if event['end_position'][0] >= 0.66)
+            left = sum(1 for event in spikes if event['end_position'][0] < LEFT_ZONE_MAX)
+            middle = sum(1 for event in spikes if LEFT_ZONE_MAX <= event['end_position'][0] < MIDDLE_ZONE_MAX)
+            right = sum(1 for event in spikes if event['end_position'][0] >= MIDDLE_ZONE_MAX)
             total = len(spikes)
             successful = sum(1 for event in spikes if event['result'] in {'kill', 'ace'})
             errors = sum(1 for event in spikes if event['result'] == 'error')

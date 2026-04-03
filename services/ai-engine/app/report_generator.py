@@ -12,6 +12,10 @@ def generate_report(data: dict[str, object], filename: str) -> str:
     doc = SimpleDocTemplate(str(output_path), pagesize=letter)
     content: list[object] = []
     styles = getSampleStyleSheet()
+    stats = data.get('stats', {})
+    if not isinstance(stats, dict):
+        stats = {}
+    insights = data.get('insights') or []
 
     content.append(Paragraph('PRIME Athletix Scouting Report', styles['Title']))
     content.append(Spacer(1, 12))
@@ -19,12 +23,12 @@ def generate_report(data: dict[str, object], filename: str) -> str:
     content.append(Paragraph(f"Summary: {data['summary']}", styles['BodyText']))
     content.append(Spacer(1, 12))
 
-    for player, stats in data['stats'].items():
-        formatted_stats = ', '.join(f'{key}={value}' for key, value in stats.items())
+    for player, player_stats in stats.items():
+        formatted_stats = ', '.join(f'{key}={value}' for key, value in player_stats.items()) if isinstance(player_stats, dict) else str(player_stats)
         content.append(Paragraph(f'{player}: {formatted_stats}', styles['BodyText']))
 
     content.append(Spacer(1, 12))
-    for insight in data['insights']:
+    for insight in insights:
         content.append(Paragraph(f'- {insight}', styles['BodyText']))
 
     doc.build(content)
