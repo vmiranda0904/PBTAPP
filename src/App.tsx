@@ -22,6 +22,7 @@ import {
 import {
   getAthlete,
   getAthletes,
+  getActiveSubscriptions,
   getStats,
   getStatsForAthletes,
   isSupabaseConfigured,
@@ -52,6 +53,19 @@ type SubscriptionPlan = {
   price: string;
   description: string;
   priceId?: string;
+};
+
+type AppStage = 'landing' | 'onboarding' | 'dashboard' | 'pitch';
+
+type UserRole = 'athlete' | 'coach' | 'recruiter';
+
+type OnboardingProfile = {
+  email: string;
+  role: UserRole;
+  position: string;
+  height: string;
+  teamName: string;
+  organization: string;
 };
 
 const screens: Screen[] = [
@@ -103,6 +117,58 @@ const subscriptionPlans: SubscriptionPlan[] = [
   },
 ];
 
+const pitchSlides = [
+  {
+    title: 'Slide 1 — Title',
+    bullets: ['PRIMEAthletix', 'AI-Powered Athlete Intelligence Platform'],
+  },
+  {
+    title: 'Slide 2 — Problem',
+    bullets: ['Coaches waste hours on film', 'Athletes lack exposure', 'Recruiting is inefficient'],
+  },
+  {
+    title: 'Slide 3 — Solution',
+    bullets: ['“We turn raw game footage into real-time insights, highlights, and recruiting intelligence.”'],
+  },
+  {
+    title: 'Slide 4 — Product Demo (Screens)',
+    bullets: ['Athlete dashboard', 'Coach dashboard', 'Recruiter search'],
+  },
+  {
+    title: 'Slide 5 — How It Works',
+    bullets: ['Upload → AI → Stats + Highlights → Insights → Decisions'],
+  },
+  {
+    title: 'Slide 6 — Key Features',
+    bullets: ['AI highlight generation', 'live game tracking', 'opponent scouting', 'recruiting platform'],
+  },
+  {
+    title: 'Slide 7 — Market',
+    bullets: ['youth sports', 'college recruiting', 'pro development'],
+  },
+  {
+    title: 'Slide 8 — Business Model',
+    bullets: ['Athletes ($12/mo)', 'Teams ($199/mo)', 'Recruiters ($149/mo)'],
+  },
+  {
+    title: 'Slide 9 — Traction (even if early)',
+    bullets: ['working product', 'live demo', 'initial users'],
+  },
+  {
+    title: 'Slide 10 — Vision',
+    bullets: ['“The operating system for sports performance and recruiting.”'],
+  },
+];
+
+const defaultOnboardingProfile: OnboardingProfile = {
+  email: '',
+  role: 'athlete',
+  position: '',
+  height: '',
+  teamName: '',
+  organization: '',
+};
+
 function getInitials(name: string) {
   if (!name.trim()) return '';
   return name
@@ -140,10 +206,13 @@ function averageScore(athletes: AthleteRecord[]) {
 }
 
 export default function App() {
+  const [stage, setStage] = useState<AppStage>('landing');
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
+  const [onboardingProfile, setOnboardingProfile] = useState<OnboardingProfile>(defaultOnboardingProfile);
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(defaultAthleteId);
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteRecord | null>(null);
   const [selectedStats, setSelectedStats] = useState<StatsRecord | null>(null);
+  const [subscriptionState, setSubscriptionState] = useState<Set<string>>(new Set(activeSubscriptions));
   const [athletes, setAthletes] = useState<AthleteRecord[]>([]);
   const [rosterStats, setRosterStats] = useState<StatsRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,9 +229,9 @@ export default function App() {
 
   const supabaseReady = isSupabaseConfigured();
   const aiPipelineUrl = import.meta.env.VITE_AI_PIPELINE_URL;
-  const athleteSubscriptionActive = activeSubscriptions.has('athlete');
-  const coachSubscriptionActive = activeSubscriptions.has('coach');
-  const recruiterSubscriptionActive = activeSubscriptions.has('recruiter');
+  const athleteSubscriptionActive = subscriptionState.has('athlete');
+  const coachSubscriptionActive = subscriptionState.has('coach');
+  const recruiterSubscriptionActive = subscriptionState.has('recruiter');
 
   useEffect(() => {
     let cancelled = false;
@@ -288,6 +357,39 @@ export default function App() {
     };
   }, [aiPipelineUrl]);
 
+  useEffect(() => {
+    if (!supabaseReady || !onboardingProfile.email.trim()) {
+      setSubscriptionState(new Set(activeSubscriptions));
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadSubscriptions() {
+      try {
+        const subscriptions = await getActiveSubscriptions(onboardingProfile.email);
+        if (cancelled) return;
+
+        setSubscriptionState(
+          new Set([
+            ...activeSubscriptions,
+            ...subscriptions.map((subscription) => subscription.plan_key.toLowerCase()),
+          ]),
+        );
+      } catch {
+        if (!cancelled) {
+          setSubscriptionState(new Set(activeSubscriptions));
+        }
+      }
+    }
+
+    void loadSubscriptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onboardingProfile.email, supabaseReady]);
+
   const rosterStatsByAthlete = useMemo(
     () => new Map(rosterStats.map((stats) => [stats.athlete_id, stats])),
     [rosterStats],
@@ -347,7 +449,11 @@ export default function App() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
       setCheckoutMessage(null);
-      await subscribeToCheckout(plan.priceId);
+      await subscribeToCheckout({
+        priceId: plan.priceId,
+        customerEmail: onboardingProfile.email,
+        planKey: plan.key,
+      });
     } catch (error) {
       setCheckoutMessage(error instanceof Error ? error.message : 'Unable to start checkout.');
     }
@@ -356,6 +462,36 @@ export default function App() {
   function openRecruiterProfile(athleteId: string) {
     setSelectedAthleteId(athleteId);
     setActiveScreen('profile');
+  }
+
+  function handleOnboardingComplete(profile: OnboardingProfile) {
+    setOnboardingProfile(profile);
+    setStage('dashboard');
+    setActiveScreen(profile.role === 'coach' ? 'coach' : profile.role === 'recruiter' ? 'recruiter' : 'athlete');
+  }
+
+  if (stage === 'landing') {
+    return (
+      <LandingPage
+        plans={subscriptionPlans}
+        onGetStarted={() => setStage('onboarding')}
+        onViewPitch={() => setStage('pitch')}
+      />
+    );
+  }
+
+  if (stage === 'onboarding') {
+    return (
+      <OnboardingFlow
+        value={onboardingProfile}
+        onBack={() => setStage('landing')}
+        onComplete={handleOnboardingComplete}
+      />
+    );
+  }
+
+  if (stage === 'pitch') {
+    return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
   }
 
   return (
@@ -489,7 +625,7 @@ export default function App() {
 
         {activeScreen === 'profile' ? <AthleteProfile athlete={selectedAthlete} stats={selectedStats} loading={loadingAthlete} /> : null}
 
-        <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={activeSubscriptions} onSubscribe={handleSubscribe} />
+        <SubscriptionPanel plans={subscriptionPlans} activeSubscriptions={subscriptionState} onSubscribe={handleSubscribe} />
       </div>
     </div>
   );
@@ -1099,6 +1235,280 @@ function AthleteProfile({
           </div>
         </Panel>
       </section>
+    </div>
+  );
+}
+
+function LandingPage({
+  plans,
+  onGetStarted,
+  onViewPitch,
+}: {
+  plans: SubscriptionPlan[];
+  onGetStarted: () => void;
+  onViewPitch: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-[#050816] text-slate-50">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(34,197,94,0.16),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.92),_rgba(2,6,23,1))]" />
+      <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <section className="grid gap-6 rounded-[36px] border border-white/10 bg-slate-950/70 p-8 shadow-2xl shadow-black/30 backdrop-blur lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
+              PRIMEAthletix
+              <span className="text-xs tracking-[0.24em] text-emerald-300">AI-Powered Athlete Intelligence</span>
+            </div>
+            <div className="space-y-4">
+              <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-6xl">AI-Powered Athlete Intelligence</h1>
+              <p className="max-w-2xl text-base text-slate-300">
+                Turn game film into highlights, stats, and recruiting exposure.
+              </p>
+              <p className="max-w-2xl text-sm text-slate-400">
+                We’re not building another sports app — we’re building the AI operating system for athlete development and recruiting.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={onGetStarted}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+              >
+                Start onboarding
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onViewPitch}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.08]"
+              >
+                View investor deck
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {['Used by competitive athletes', 'Built for high-performance teams', 'Ready for live demos'].map((item) => (
+                <span key={item} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <StatCard label="Flow" value="Upload → AI → Insight" detail="Stats, highlights, and decisions from one pipeline" />
+            <StatCard label="Business model" value="3 streams" detail="Athletes, teams, and recruiters" />
+            <StatCard label="Architecture" value="Live" detail="Vercel + Railway + Supabase + Stripe" />
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            ['🎥', 'Auto Highlights', 'Generate recruiting-ready clips from uploaded film.'],
+            ['📊', 'AI Stats', 'Capture spikes, sets, serves, and errors into live athlete profiles.'],
+            ['🧠', 'Game Planning', 'Turn live reads into coach-facing adjustments.'],
+            ['🏆', 'Recruiting', 'Convert performance into search, exposure, and outreach.'],
+          ].map(([emoji, title, detail]) => (
+            <Panel key={title}>
+              <div className="text-2xl">{emoji}</div>
+              <h2 className="mt-4 text-xl font-semibold text-white">{title}</h2>
+              <p className="mt-2 text-sm text-slate-400">{detail}</p>
+            </Panel>
+          ))}
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-3">
+          {plans.map((plan) => (
+            <Panel key={plan.key}>
+              <p className="text-sm uppercase tracking-[0.24em] text-cyan-200">{plan.label}</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{plan.price}</p>
+              <p className="mt-3 text-sm text-slate-400">{plan.description}</p>
+            </Panel>
+          ))}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingFlow({
+  value,
+  onBack,
+  onComplete,
+}: {
+  value: OnboardingProfile;
+  onBack: () => void;
+  onComplete: (profile: OnboardingProfile) => void;
+}) {
+  const [profile, setProfile] = useState<OnboardingProfile>(value);
+
+  const firstAction =
+    profile.role === 'athlete'
+      ? 'Upload video'
+      : profile.role === 'coach'
+        ? 'View demo game plan'
+        : 'Browse players';
+
+  return (
+    <div className="min-h-screen bg-[#050816] text-slate-50">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <Panel>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Onboarding</p>
+              <h1 className="mt-2 text-3xl font-semibold text-white">Set up your first live experience</h1>
+            </div>
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-100"
+            >
+              Back
+            </button>
+          </div>
+        </Panel>
+
+        <section className="grid gap-6 lg:grid-cols-3">
+          <Panel>
+            <p className="text-sm uppercase tracking-[0.28em] text-emerald-300">Step 1 — Role selection</p>
+            <div className="mt-4 grid gap-3">
+              {(['athlete', 'coach', 'recruiter'] as UserRole[]).map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setProfile((current) => ({ ...current, role }))}
+                  className={`rounded-2xl border px-4 py-3 text-left text-sm ${
+                    profile.role === role ? 'border-cyan-400/50 bg-cyan-400/10 text-white' : 'border-white/10 bg-white/[0.03] text-slate-300'
+                  }`}
+                >
+                  I am: <span className="font-semibold capitalize">{role}</span>
+                </button>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel>
+            <p className="text-sm uppercase tracking-[0.28em] text-emerald-300">Step 2 — Quick setup</p>
+            <div className="mt-4 grid gap-3">
+              <input
+                value={profile.email}
+                onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                placeholder="Email"
+              />
+              {profile.role === 'athlete' ? (
+                <>
+                  <input
+                    value={profile.position}
+                    onChange={(event) => setProfile((current) => ({ ...current, position: event.target.value }))}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                    placeholder="Position"
+                  />
+                  <input
+                    value={profile.height}
+                    onChange={(event) => setProfile((current) => ({ ...current, height: event.target.value }))}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                    placeholder="Height"
+                  />
+                </>
+              ) : null}
+              {profile.role === 'coach' ? (
+                <input
+                  value={profile.teamName}
+                  onChange={(event) => setProfile((current) => ({ ...current, teamName: event.target.value }))}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                  placeholder="Team name"
+                />
+              ) : null}
+              {profile.role === 'recruiter' ? (
+                <input
+                  value={profile.organization}
+                  onChange={(event) => setProfile((current) => ({ ...current, organization: event.target.value }))}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                  placeholder="Organization"
+                />
+              ) : null}
+            </div>
+          </Panel>
+
+          <Panel>
+            <p className="text-sm uppercase tracking-[0.28em] text-emerald-300">Step 3 — First action</p>
+            <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-lg font-semibold text-white">{firstAction}</p>
+              <p className="mt-2 text-sm text-slate-400">
+                {profile.role === 'athlete'
+                  ? 'Bring your first clip into the AI pipeline.'
+                  : profile.role === 'coach'
+                    ? 'Open the live demo game plan and insights.'
+                    : 'Start from the recruiter search dashboard.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onComplete(profile)}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+            >
+              Continue to dashboard
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </Panel>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function InvestorPitchDeck({
+  slides,
+  onBack,
+  onGetStarted,
+}: {
+  slides: Array<{ title: string; bullets: string[] }>;
+  onBack: () => void;
+  onGetStarted: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-[#050816] text-slate-50">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <Panel>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Investor pitch</p>
+              <h1 className="mt-2 text-3xl font-semibold text-white">PRIMEAthletix</h1>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={onBack} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-100">
+                Back
+              </button>
+              <button type="button" onClick={onGetStarted} className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950">
+                Start onboarding
+              </button>
+            </div>
+          </div>
+        </Panel>
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          {slides.map((slide) => (
+            <Panel key={slide.title}>
+              <p className="text-sm uppercase tracking-[0.24em] text-emerald-300">{slide.title}</p>
+              <div className="mt-4 space-y-3">
+                {slide.bullets.map((bullet) => (
+                  <div key={bullet} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
+                    {bullet}
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          ))}
+        </section>
+
+        <Panel>
+          <div className="space-y-3">
+            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Closing line</p>
+            <p className="text-2xl font-semibold text-white">
+              “We turn every game into data, every player into a profile, and every decision into an advantage.”
+            </p>
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }

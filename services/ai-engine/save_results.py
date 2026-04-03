@@ -33,9 +33,9 @@ def save_results(athlete_id: str, stats: dict[str, int], highlight_url: str) -> 
     }
 
     if existing_stats.data:
-      supabase.table("stats").update(payload).eq("athlete_id", athlete_id).execute()
+        supabase.table("stats").update(payload).eq("athlete_id", athlete_id).execute()
     else:
-      supabase.table("stats").insert({"id": str(uuid4()), **payload}).execute()
+        supabase.table("stats").insert({"id": str(uuid4()), **payload}).execute()
 
     supabase.table("athletes").update(
         {

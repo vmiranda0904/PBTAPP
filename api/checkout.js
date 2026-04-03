@@ -16,6 +16,8 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
   const priceId = body?.priceId;
+  const customerEmail = typeof body?.customerEmail === 'string' ? body.customerEmail.trim().toLowerCase() : undefined;
+  const planKey = typeof body?.planKey === 'string' ? body.planKey.trim().toLowerCase() : undefined;
 
   if (!priceId) {
     res.status(400).json({ error: 'Missing priceId.' });
@@ -31,6 +33,11 @@ export default async function handler(req, res) {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
+      customer_email: customerEmail,
+      metadata: {
+        planKey: planKey ?? '',
+        customerEmail: customerEmail ?? '',
+      },
       success_url: successUrl,
       cancel_url: cancelUrl,
     });

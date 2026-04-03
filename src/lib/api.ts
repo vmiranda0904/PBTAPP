@@ -17,6 +17,17 @@ export type StatsRecord = {
   errors: number;
 };
 
+export type SubscriptionRecord = {
+  id: string;
+  customer_email: string;
+  plan_key: string;
+  status: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  price_id: string | null;
+  current_period_end: string | null;
+};
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error('Supabase is not configured.');
@@ -72,4 +83,18 @@ export async function getStatsForAthletes(athleteIds: string[]) {
 
   if (error) throw error;
   return (data as StatsRecord[] | null) ?? [];
+}
+
+export async function getActiveSubscriptions(customerEmail: string) {
+  if (!customerEmail.trim()) return [];
+
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('subscriptions')
+    .select('*')
+    .eq('customer_email', customerEmail.trim().toLowerCase())
+    .in('status', ['active', 'trialing']);
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return (data as SubscriptionRecord[] | null) ?? [];
 }
