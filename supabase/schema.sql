@@ -1,55 +1,34 @@
-create extension if not exists pgcrypto;
+create extension if not exists "pgcrypto";
 
-create table if not exists public.jobs (
+create table if not exists athletes (
   id uuid primary key default gen_random_uuid(),
-  user_id text not null,
-  team_id text not null,
-  status text not null check (status in ('queued', 'processing', 'completed', 'failed')),
-  processing_stage text not null default 'accepted',
-  sport text not null,
-  team_name text not null,
-  file_name text not null,
-  content_type text not null default 'application/octet-stream',
-  file_size_bytes bigint not null default 0,
-  storage_path text,
-  video_url text,
-  report_storage_path text,
-  pdf_storage_path text,
-  video_hash text,
-  error text,
-  retry_count integer not null default 0,
-  max_retries integer not null default 0,
-  timings_ms jsonb not null default '{}'::jsonb,
-  result jsonb,
-  result_url text,
-  download_url text,
-  pdf_report_url text,
-  started_at timestamptz,
-  completed_at timestamptz,
-  last_error_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  name text not null,
+  position text,
+  score numeric default 0,
+  highlight_url text
 );
 
-create index if not exists jobs_status_idx on public.jobs (status, created_at desc);
-create index if not exists jobs_owner_idx on public.jobs (user_id, team_id, created_at desc);
-create index if not exists jobs_video_hash_idx on public.jobs (video_hash) where video_hash is not null;
+create table if not exists stats (
+  id uuid primary key default gen_random_uuid(),
+  athlete_id uuid not null references athletes(id) on delete cascade,
+  spikes int default 0,
+  sets int default 0,
+  serves int default 0,
+  errors int default 0
+);
 
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+create index if not exists stats_athlete_id_idx on stats (athlete_id);
 
- drop trigger if exists jobs_set_updated_at on public.jobs;
-create trigger jobs_set_updated_at
-before update on public.jobs
-for each row execute function public.set_updated_at();
+create table if not exists subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  customer_email text not null,
+  plan_key text not null,
+  status text not null,
+  stripe_customer_id text,
+  stripe_subscription_id text unique,
+  price_id text,
+  current_period_end timestamptz,
+  updated_at timestamptz not null default timezone('utc', now())
+);
 
-insert into storage.buckets (id, name, public)
-values ('videos', 'videos', true)
-on conflict (id) do nothing;
+create index if not exists subscriptions_customer_email_idx on subscriptions (customer_email);

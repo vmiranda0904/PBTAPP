@@ -27,7 +27,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Python build artifacts
 __pycache__/
-*.py[cod]
+*.pyc
