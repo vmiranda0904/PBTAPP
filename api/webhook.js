@@ -81,7 +81,8 @@ export default async function handler(req, res) {
 
   try {
     const rawBody = await readRawBody(req);
-    const signature = req.headers['stripe-signature'];
+    const signatureHeader = req.headers['stripe-signature'];
+    const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
 
     if (typeof signature !== 'string') {
       res.status(400).json({ error: 'Missing Stripe signature.' });
