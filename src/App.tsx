@@ -23,6 +23,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ProductPlatformPanel from './components/ProductPlatformPanel';
 import { useAthletePrimaryAction } from '@/modules/athlete/useAthletePrimaryAction';
 import { useAuth } from '@/modules/auth/useAuth';
+import { useUserRole, type AppUserRole } from '@/modules/auth/useUserRole';
 import {
   getActiveSubscriptions,
   getAthlete,
@@ -277,8 +278,50 @@ function getScreenMeta(screenId: ScreenKey) {
   return screens.find((screen) => screen.id === screenId) ?? screens[0];
 }
 
+function getDefaultScreenForRole(role: AppUserRole | null): ScreenKey {
+  switch (role) {
+    case 'admin':
+    case 'coach':
+      return 'coach';
+    case 'recruiter':
+      return 'recruiter';
+    case 'athlete':
+    default:
+      return 'athlete';
+  }
+}
+
+function getAllowedScreensForRole(role: AppUserRole | null): ScreenKey[] {
+  switch (role) {
+    case 'admin':
+      return screens.map((screen) => screen.id);
+    case 'coach':
+      return ['coach', 'live', 'profile'];
+    case 'recruiter':
+      return ['recruiter', 'profile'];
+    case 'athlete':
+      return ['athlete', 'profile'];
+    default:
+      return [];
+  }
+}
+
+function toOnboardingRole(role: AppUserRole | null): UserRole {
+  switch (role) {
+    case 'admin':
+    case 'coach':
+      return 'coach';
+    case 'recruiter':
+      return 'recruiter';
+    case 'athlete':
+    default:
+      return 'athlete';
+  }
+}
+
 export default function App() {
   const authContext = useAuth();
+  const { role: userRole, loading: loadingUserRole } = useUserRole(authContext.user);
   const [stage, setStage] = useState<AppStage>('landing');
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
   const [onboardingProfile, setOnboardingProfile] = useState<OnboardingProfile>(defaultOnboardingProfile);
@@ -309,6 +352,38 @@ export default function App() {
   const athleteSubscriptionActive = subscriptionState.has('athlete');
   const coachSubscriptionActive = subscriptionState.has('coach');
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
+  const allowedScreens = useMemo(() => getAllowedScreensForRole(userRole), [userRole]);
+  const availableScreens = useMemo(() => screens.filter((screen) => allowedScreens.includes(screen.id)), [allowedScreens]);
+
+  useEffect(() => {
+    if (!authContext.isAuthenticated) {
+      return;
+    }
+
+    setStage('dashboard');
+  }, [authContext.isAuthenticated]);
+
+  useEffect(() => {
+    if (!authContext.isAuthenticated) {
+      return;
+    }
+
+    setOnboardingProfile((current) => ({
+      ...current,
+      email: authContext.user?.email ?? current.email,
+      role: toOnboardingRole(userRole),
+    }));
+  }, [authContext.isAuthenticated, authContext.user?.email, userRole]);
+
+  useEffect(() => {
+    if (!authContext.isAuthenticated || !userRole) {
+      return;
+    }
+
+    const defaultScreen = getDefaultScreenForRole(userRole);
+
+    setActiveScreen((current) => (allowedScreens.includes(current) ? current : defaultScreen));
+  }, [allowedScreens, authContext.isAuthenticated, userRole]);
 
   useEffect(() => {
     let cancelled = false;
@@ -565,6 +640,10 @@ export default function App() {
   }
 
   function openRecruiterProfile(athleteId: string) {
+    if (!allowedScreens.includes('profile')) {
+      return;
+    }
+
     setSelectedAthleteId(athleteId);
     setActiveScreen('profile');
   }
@@ -617,6 +696,35 @@ export default function App() {
     return <Login />;
   }
 
+  if (loadingUserRole) {
+    return (
+      <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
+        <div className="mx-auto flex max-w-xl items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          Loading dashboard access...
+        </div>
+      </div>
+    );
+  }
+
+  if (!userRole) {
+    return (
+      <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
+        <div className="mx-auto max-w-xl rounded-3xl border border-rose-500/30 bg-rose-500/10 p-8 text-center">
+          <p className="text-sm uppercase tracking-[0.28em] text-rose-200">Access restricted</p>
+          <h1 className="mt-3 text-3xl font-semibold text-white">No dashboard is assigned to this account.</h1>
+          <p className="mt-3 text-sm text-slate-300">Ask an administrator to update your role before signing in again.</p>
+          <button
+            type="button"
+            onClick={authContext.logout}
+            className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050816] text-slate-50">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(34,197,94,0.14),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.88),_rgba(2,6,23,1))]" />
@@ -637,6 +745,9 @@ export default function App() {
                   <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
                     This app now reads athletes and stat rows from Supabase, listens for live AI pipeline updates, and exposes Stripe-powered upgrade paths for premium workflows.
                   </p>
+                  <div className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">
+                    {userRole} access
+                  </div>
                 </div>
 
                 <ul className="flex flex-wrap gap-2" aria-label="Connected product flow highlights">
@@ -679,7 +790,7 @@ export default function App() {
             <h2 className="mt-2 text-3xl font-semibold text-white">{getScreenMeta(activeScreen).label}</h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">{getScreenMeta(activeScreen).summary}</p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {screens.map((screen) => (
+              {availableScreens.map((screen) => (
                 <button
                   key={screen.id}
                   type="button"
