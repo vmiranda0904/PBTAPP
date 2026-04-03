@@ -24,4 +24,4 @@ def log_event(event: str, **fields: Any) -> None:
 
 def log_exception(event: str, **fields: Any) -> None:
     payload = {'event': event, **fields}
-    logger.exception(json.dumps(payload, default=str, sort_keys=True))
+    logger.error(json.dumps(payload, default=str, sort_keys=True), exc_info=True)

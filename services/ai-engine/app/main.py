@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 import uuid
 from typing import Annotated
@@ -90,6 +89,19 @@ def _normalize_text(value: str, fallback: str, field_name: str, max_length: int)
     return normalized
 
 
+async def _read_upload_payload(video: UploadFile) -> bytes:
+    content_length = video.headers.get('content-length') if video.headers else None
+    if content_length and int(content_length) > AI_ENGINE_MAX_UPLOAD_BYTES:
+        raise RequestValidationError('Uploaded video exceeds the configured size limit.', status_code=413)
+
+    buffer = bytearray()
+    while chunk := await video.read(1024 * 1024):
+        buffer.extend(chunk)
+        if len(buffer) > AI_ENGINE_MAX_UPLOAD_BYTES:
+            raise RequestValidationError('Uploaded video exceeds the configured size limit.', status_code=413)
+    return bytes(buffer)
+
+
 def _validate_upload(video: UploadFile, payload: bytes) -> tuple[str, str, int]:
     filename = (video.filename or '').strip()
     if not filename:
@@ -164,7 +176,7 @@ async def create_job(
     owner_user_id, owner_team_id = _require_owner(user_id, team_id)
     normalized_sport = _normalize_text(sport, DEFAULT_SPORT, 'sport', 64)
     normalized_team_name = _normalize_text(team_name, 'Opponent team', 'team_name', 120)
-    payload = await video.read()
+    payload = await _read_upload_payload(video)
     filename, content_type, file_size = _validate_upload(video, payload)
 
     job = VideoJob(

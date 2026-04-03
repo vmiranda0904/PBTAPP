@@ -4,6 +4,7 @@ import hashlib
 import json
 import random
 import time
+from urllib.parse import urlparse
 from urllib.request import urlopen
 from datetime import datetime, timezone
 
@@ -38,8 +39,15 @@ def _sha256_for_bytes(payload: bytes) -> tuple[str, int]:
     return hashlib.sha256(payload).hexdigest(), len(payload)
 
 
+def _validate_video_url(video_url: str) -> None:
+    parsed = urlparse(video_url)
+    if parsed.scheme != 'https' or not parsed.netloc.endswith('.supabase.co') or '/storage/v1/object/public/' not in parsed.path:
+        raise RuntimeError('Invalid video URL source.')
+
+
 def _download_video_bytes(video_url: str) -> bytes:
-    with urlopen(video_url) as response:  # nosec B310 - URL comes from Supabase storage under app control
+    _validate_video_url(video_url)
+    with urlopen(video_url) as response:  # nosec B310
         return response.read()
 
 
