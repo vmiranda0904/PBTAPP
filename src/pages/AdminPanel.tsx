@@ -74,7 +74,11 @@ function initials(name: string) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdminPanel() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="p-6 text-slate-200">Checking access…</div>;
+  }
 
   if (!isAdmin) return <Navigate to="/" replace />;
 

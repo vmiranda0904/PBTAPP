@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { normalizeUserRole, type AppUserRole } from '@/modules/auth/useUserRole';
 import { supabase } from '@/services/supabase';
 import type { AuthContextValue, AuthUser, LoginResult, RegisterFields, RegisterResult } from '@/types/auth';
 import { AuthContext } from '@/store/auth-context';
@@ -63,34 +64,100 @@ function toSupabaseAuthUser(user: SupabaseUser): AuthUser {
   };
 }
 
+function formatRoleLabel(role: AppUserRole) {
+  switch (role) {
+    case 'admin':
+      return 'Admin';
+    case 'coach':
+      return 'Coach';
+    case 'recruiter':
+      return 'Recruiter';
+    case 'athlete':
+    default:
+      return 'Athlete';
+  }
+}
+
+async function resolveSupabaseAuthUser(user: SupabaseUser) {
+  const authUser = toSupabaseAuthUser(user);
+
+  if (!supabase) {
+    return authUser;
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Unable to hydrate Supabase user role:', error);
+    return authUser;
+  }
+
+  const normalizedRole = normalizeUserRole(data?.role);
+
+  if (!normalizedRole) {
+    return authUser;
+  }
+
+  return {
+    ...authUser,
+    role: formatRoleLabel(normalizedRole),
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
   useEffect(() => {
     if (!supabase) {
+      setIsLoading(false);
       return undefined;
     }
 
     let active = true;
 
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!active || error || !data.session?.user) {
+    const syncSupabaseSession = async (sessionUser: SupabaseUser | null) => {
+      if (!active) {
         return;
       }
 
-      setUser((currentUser) => currentUser ?? toSupabaseAuthUser(data.session.user));
+      if (!sessionUser) {
+        setUser((currentUser) => (currentUser?.authSource === 'supabase' ? null : currentUser));
+        setIsLoading(false);
+        return;
+      }
+
+      const nextUser = await resolveSupabaseAuthUser(sessionUser);
+
+      if (!active) {
+        return;
+      }
+
+      setUser(nextUser);
+      setIsLoading(false);
+    };
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!active) {
+        return;
+      }
+
+      if (error) {
+        setIsLoading(false);
+        return;
+      }
+
+      void syncSupabaseSession(data.session?.user ?? null);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser((currentUser) => {
-        if (session?.user) {
-          return currentUser ?? toSupabaseAuthUser(session.user);
-        }
-
-        return currentUser?.authSource === 'supabase' ? null : currentUser;
-      });
+      void syncSupabaseSession(session?.user ?? null);
     });
 
     return () => {
@@ -99,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const isAdmin = !!user && user.role === 'Admin';
+  const isAdmin = normalizeUserRole(user?.role) === 'admin';
   const adminTeamId = user?.teamId;
   const seenPendingIds = useRef<Set<string>>(new Set());
   const isFirstSnapshot = useRef(true);
@@ -259,6 +326,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     approveUser,
     isAuthenticated: !!user,
     isAdmin,
+    isLoading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
