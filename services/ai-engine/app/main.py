@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import uuid
 from pathlib import Path
+import re
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,14 @@ from .config import PIPELINE_DEFAULTS, REPORTS_DIR, pipeline_defaults_dict, dete
 from .job_store import get_job, save_job
 from .pipeline import process_video_job
 from .schemas import CreateJobResponse, HealthResponse, VideoJob
+
+JOB_ID_PATTERN = re.compile(r'^[0-9a-f]{32}$')
+
+
+def _validate_job_id(job_id: str) -> str:
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        raise HTTPException(status_code=400, detail='Invalid job id.')
+    return job_id
 
 app = FastAPI(
     title='PBTAPP AI Engine',
@@ -88,6 +97,7 @@ async def create_job(
 
 @app.get('/jobs/{job_id}', response_model=VideoJob)
 def get_job_by_id(job_id: str) -> VideoJob:
+    _validate_job_id(job_id)
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail='Job not found.')
@@ -96,6 +106,7 @@ def get_job_by_id(job_id: str) -> VideoJob:
 
 @app.get('/jobs/{job_id}/report')
 def download_job_report(job_id: str) -> FileResponse:
+    _validate_job_id(job_id)
     job = get_job(job_id)
     if not job or not job.report:
         raise HTTPException(status_code=404, detail='Report not ready.')
@@ -110,6 +121,7 @@ def download_job_report(job_id: str) -> FileResponse:
 
 @app.get('/jobs/{job_id}/report.pdf')
 def download_job_pdf_report(job_id: str) -> FileResponse:
+    _validate_job_id(job_id)
     job = get_job(job_id)
     if not job or not job.report:
         raise HTTPException(status_code=404, detail='Report not ready.')

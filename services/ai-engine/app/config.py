@@ -38,7 +38,7 @@ def detect_device() -> str:
 
 
 PIPELINE_DEFAULTS = PipelineDefaults()
-DEFAULT_SPORT = os.environ.get('AI_ENGINE_DEFAULT_SPORT', 'soccer')
+DEFAULT_SPORT = os.environ.get('AI_ENGINE_DEFAULT_SPORT', 'volleyball')
 AI_ENGINE_PORT = int(os.environ.get('AI_ENGINE_PORT', '8000'))
 
 

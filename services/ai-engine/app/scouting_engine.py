@@ -8,12 +8,15 @@ from .schemas import HeatmapCell, OpponentProfile, PlayEvent, PlayerScoutingSumm
 from .tendency_engine import TendencyEngine
 from .weakness_engine import detect_weakness
 
+GRID_SIZE = 3
+MAX_BIN_INDEX = GRID_SIZE - 1
+
 
 def _heatmap_for_events(events: Iterable[PlayEvent]) -> list[HeatmapCell]:
     bins: dict[tuple[int, int], int] = defaultdict(int)
     for event in events:
-        x = min(2, max(0, int(event.end_position[0] * 3)))
-        y = min(2, max(0, int(event.end_position[1] * 3)))
+        x = min(MAX_BIN_INDEX, max(0, int(event.end_position[0] * GRID_SIZE)))
+        y = min(MAX_BIN_INDEX, max(0, int(event.end_position[1] * GRID_SIZE)))
         bins[(x, y)] += 1
 
     return [

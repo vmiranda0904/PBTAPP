@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import AiVideoPanel from './components/AiVideoPanel';
+import ProductPlatformPanel from './components/ProductPlatformPanel';
 
 type TeamMember = {
   id: number;
@@ -275,6 +276,8 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        <ProductPlatformPanel />
 
         <AiVideoPanel />
 

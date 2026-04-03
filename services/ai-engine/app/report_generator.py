@@ -20,7 +20,8 @@ def generate_report(data: dict[str, object], filename: str) -> str:
     content.append(Spacer(1, 12))
 
     for player, stats in data['stats'].items():
-        content.append(Paragraph(f'{player}: {stats}', styles['BodyText']))
+        formatted_stats = ', '.join(f'{key}={value}' for key, value in stats.items())
+        content.append(Paragraph(f'{player}: {formatted_stats}', styles['BodyText']))
 
     content.append(Spacer(1, 12))
     for insight in data['insights']:

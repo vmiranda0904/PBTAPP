@@ -3,6 +3,8 @@ from __future__ import annotations
 
 def detect_weakness(events: list[dict[str, object]]) -> str | None:
     errors = [event for event in events if event['result'] == 'error']
+    if not errors:
+        return None
     if len(errors) < 3:
         return None
 

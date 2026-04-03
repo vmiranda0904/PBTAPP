@@ -14,9 +14,9 @@ export function speak(text: string) {
   return true;
 }
 
-export function speakPriority(insights: PriorityAlert[], cooldownMs = 4000) {
+export function speakPriority(alerts: PriorityAlert[], cooldownMs = 4000) {
   const now = Date.now();
-  const highPriority = insights.find((insight) => insight.level === 'high') ?? insights[0];
+  const highPriority = alerts.find((alert) => alert.level === 'high') ?? alerts[0];
 
   if (!highPriority || now - lastSpokenAt <= cooldownMs) {
     return false;

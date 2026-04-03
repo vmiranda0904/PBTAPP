@@ -2,6 +2,12 @@
 
 A simple React + Vite workspace for team communication, shared calendar planning, roster visibility, and lightweight management tracking.
 
+The product direction now spans three connected experiences:
+
+- **Athlete App** — highlights, stats, score, and shareable recruiting profiles
+- **Team / Coach Platform** — analytics, scouting, game plans, and live coaching tools
+- **Recruiter Network** — athlete search, rankings, comparisons, and saved prospects
+
 ## Features
 
 - Team communication feed for announcements and channel updates

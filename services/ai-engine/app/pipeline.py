@@ -20,6 +20,12 @@ from .playbook_engine import generate_playbook
 from .scouting_engine import build_scouting_report
 from .team_matchup import team_matchup
 
+DEMO_PLAYER_IDS = range(1, 5)
+PRESSURE_WEIGHTS = [0.25, 0.45, 0.30]
+PLAY_TYPE_WEIGHTS = [0.65, 0.2, 0.15]
+NORMAL_RESULT_WEIGHTS = [0.42, 0.24, 0.16, 0.1, 0.08]
+HIGH_PRESSURE_RESULT_WEIGHTS = [0.28, 0.22, 0.3, 0.08, 0.12]
+
 
 def _sha256_for_file(file_path: Path) -> tuple[str, int]:
     digest = hashlib.sha256()
@@ -53,14 +59,14 @@ def _generate_demo_events(video_hash: str) -> list[PlayEvent]:
     sequence_id = 1
     timestamp = 0.0
 
-    for player_id in range(1, 5):
+    for player_id in DEMO_PLAYER_IDS:
         for _ in range(18):
-            pressure_level = rng.choices(['low', 'medium', 'high'], weights=[0.25, 0.45, 0.30], k=1)[0]
-            play_type = rng.choices(['spike', 'serve', 'dig'], weights=[0.65, 0.2, 0.15], k=1)[0]
+            pressure_level = rng.choices(['low', 'medium', 'high'], weights=PRESSURE_WEIGHTS, k=1)[0]
+            play_type = rng.choices(['spike', 'serve', 'dig'], weights=PLAY_TYPE_WEIGHTS, k=1)[0]
             bias = biases[player_id] if play_type == 'spike' else rng.choice(['left', 'middle', 'right'])
             result = rng.choices(
                 ['kill', 'continuation', 'error', 'ace', 'blocked'],
-                weights=[0.42, 0.24, 0.16, 0.1, 0.08] if pressure_level != 'high' else [0.28, 0.22, 0.3, 0.08, 0.12],
+                weights=NORMAL_RESULT_WEIGHTS if pressure_level != 'high' else HIGH_PRESSURE_RESULT_WEIGHTS,
                 k=1,
             )[0]
 

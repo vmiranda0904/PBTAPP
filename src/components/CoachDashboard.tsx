@@ -134,8 +134,8 @@ function PanelList({ title, items, tone }: { title: string; items: string[]; ton
     <div className={`rounded-2xl border p-4 ${toneStyles[tone]}`}>
       <p className="text-sm font-medium">{title}</p>
       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm">
-        {(items.length > 0 ? items : ['No items yet']).map((item) => (
-          <li key={item}>{item}</li>
+        {(items.length > 0 ? items : ['No items yet']).map((item, index) => (
+          <li key={`${title}-${index}`}>{item}</li>
         ))}
       </ul>
     </div>

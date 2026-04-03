@@ -28,7 +28,7 @@ class TendencyEngine:
             high_pressure = sum(1 for event in spikes if event.get('pressure_level') == 'high')
 
             zone_counts = {'left': left, 'middle': middle, 'right': right}
-            preferred_zone = max(zone_counts, key=zone_counts.__getitem__)
+            preferred_zone = max(zone_counts, key=lambda key: zone_counts[key])
 
             report[player_id] = {
                 'left_pct': left / total,

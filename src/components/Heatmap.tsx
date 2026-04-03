@@ -17,7 +17,7 @@ export default function Heatmap({ cells: heatmapCells }: { cells: HeatmapCell[] 
             key={`${cell.x}-${cell.y}`}
             className="flex aspect-square items-center justify-center rounded-2xl border border-white/10 text-sm font-medium text-white"
             style={{ backgroundColor: `rgba(56, 189, 248, ${intensity.toFixed(2)})` }}
-            title={`Zone ${cell.x + 1}-${cell.y + 1}: ${count} plays`}
+            title={`Column ${cell.x + 1}, row ${cell.y + 1}: ${count} plays`}
           >
             {count}
           </div>
