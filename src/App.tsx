@@ -313,7 +313,9 @@ function getDashboardPath(screen: ScreenKey) {
 }
 
 function getDashboardScreenFromPath(pathname: string): ScreenKey | null {
-  const [, dashboardSegment, screenSegment] = pathname.replace(/\/+$/, '').split('/');
+  const parts = pathname.replace(/\/+$/, '').split('/');
+  const dashboardSegment = parts[1];
+  const screenSegment = parts[2];
 
   if (dashboardSegment !== 'dashboard') {
     return null;
@@ -667,10 +669,13 @@ export default function App() {
       return;
     }
 
-    setLoadingAthlete(true);
+    if (athleteId !== selectedAthleteId) {
+      setLoadingAthlete(true);
+      setSelectedAthlete(null);
+      setSelectedStats(null);
+    }
+
     setSelectedAthleteId(athleteId);
-    setSelectedAthlete(null);
-    setSelectedStats(null);
     navigate(getDashboardPath('profile'));
   }
 

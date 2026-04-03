@@ -83,6 +83,10 @@ function toSupabaseErrorMessage(error: { message?: string } | null | undefined, 
   return message ? message : fallback;
 }
 
+function normalizeEmailAddress(value: string) {
+  return value.trim().toLowerCase();
+}
+
 async function upsertSupabaseProfile(user: SupabaseUser, {
   email,
   name,
@@ -244,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [adminTeamId, isAdmin]);
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = normalizeEmailAddress(email);
 
     try {
       let supabaseLoginError: string | null = null;
@@ -310,7 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let teamAdminEmail: string | undefined;
       let returnedTeamCode: string | undefined;
 
-      const emailNorm = fields.email.toLowerCase().trim();
+      const emailNorm = normalizeEmailAddress(fields.email);
       const isAdminEmail = !!ADMIN_EMAIL_ENV && emailNorm === ADMIN_EMAIL_ENV;
 
       if (fields.teamCode) {
