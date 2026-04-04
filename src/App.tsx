@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
   ArrowRight,
@@ -51,8 +52,6 @@ type SubscriptionPlan = {
   description: string;
   priceId?: string;
 };
-
-type AppStage = 'landing' | 'onboarding' | 'dashboard' | 'pitch';
 
 type UserRole = 'athlete' | 'coach' | 'recruiter';
 
@@ -309,6 +308,31 @@ function getAllowedScreensForRole(role: AppUserRole | null): ScreenKey[] {
   }
 }
 
+function getDashboardPath(screen: ScreenKey) {
+  return `/dashboard/${screen}`;
+}
+
+function getDashboardScreenFromPath(pathname: string): ScreenKey | null {
+  const parts = pathname.replace(/\/+$/, '').split('/');
+  const dashboardSegment = parts[1];
+  const screenSegment = parts[2];
+
+  if (dashboardSegment !== 'dashboard') {
+    return null;
+  }
+
+  switch (screenSegment) {
+    case 'athlete':
+    case 'coach':
+    case 'live':
+    case 'recruiter':
+    case 'profile':
+      return screenSegment;
+    default:
+      return null;
+  }
+}
+
 function toOnboardingRole(role: AppUserRole | null): UserRole {
   switch (role) {
     case 'admin':
@@ -325,8 +349,8 @@ function toOnboardingRole(role: AppUserRole | null): UserRole {
 export default function App() {
   const authContext = useAuth();
   const { role: userRole, loading: loadingUserRole } = useUserRole(authContext.user);
-  const [stage, setStage] = useState<AppStage>('landing');
-  const [activeScreen, setActiveScreen] = useState<ScreenKey>('athlete');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [onboardingProfile, setOnboardingProfile] = useState<OnboardingProfile>(defaultOnboardingProfile);
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(defaultAthleteId);
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteRecord | null>(null);
@@ -357,16 +381,19 @@ export default function App() {
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
   const allowedScreens = useMemo(() => getAllowedScreensForRole(userRole), [userRole]);
   const roleFilteredScreens = useMemo(() => screens.filter((screen) => allowedScreens.includes(screen.id)), [allowedScreens]);
-
-  useEffect(() => {
-    setStage((current) => {
-      if (authContext.isAuthenticated) {
-        return current === 'landing' ? 'dashboard' : current;
-      }
-
-      return current === 'dashboard' ? 'landing' : current;
-    });
-  }, [authContext.isAuthenticated]);
+  const subscriptionLookup = useMemo(
+    () => ({
+      userId: authContext.user?.authSource === 'supabase' ? authContext.user.id : null,
+      customerEmail: authContext.user?.email ?? onboardingProfile.email,
+    }),
+    [authContext.user?.authSource, authContext.user?.email, authContext.user?.id, onboardingProfile.email],
+  );
+  const canLoadSubscriptions = supabaseReady && Boolean(subscriptionLookup.userId || subscriptionLookup.customerEmail);
+  const pathname = location.pathname.replace(/\/+$/, '') || '/';
+  const requestedScreen = getDashboardScreenFromPath(pathname);
+  const defaultScreen = getDefaultScreenForRole(userRole);
+  const activeScreen = requestedScreen && allowedScreens.includes(requestedScreen) ? requestedScreen : defaultScreen;
+  const isDashboardPath = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
 
   useEffect(() => {
     if (!authContext.isAuthenticated) {
@@ -381,14 +408,16 @@ export default function App() {
   }, [authContext.isAuthenticated, authContext.user?.email, userRole]);
 
   useEffect(() => {
-    if (!authContext.isAuthenticated || !userRole) {
+    if (!authContext.isAuthenticated || !userRole || !isDashboardPath) {
       return;
     }
 
-    const defaultScreen = getDefaultScreenForRole(userRole);
+    const targetPath = getDashboardPath(defaultScreen);
 
-    setActiveScreen((current) => (allowedScreens.includes(current) ? current : defaultScreen));
-  }, [allowedScreens, authContext.isAuthenticated, userRole]);
+    if ((pathname === '/dashboard' || !requestedScreen || !allowedScreens.includes(requestedScreen)) && pathname !== targetPath) {
+      navigate(getDashboardPath(defaultScreen), { replace: true });
+    }
+  }, [allowedScreens, authContext.isAuthenticated, defaultScreen, isDashboardPath, navigate, pathname, requestedScreen, userRole]);
 
   useEffect(() => {
     let cancelled = false;
@@ -542,7 +571,7 @@ export default function App() {
   }, [aiPipelineUrl]);
 
   useEffect(() => {
-    if (!supabaseReady || !onboardingProfile.email.trim()) {
+    if (!canLoadSubscriptions) {
       setSubscriptionState(new Set(activeSubscriptions));
       return;
     }
@@ -551,18 +580,24 @@ export default function App() {
 
     async function loadSubscriptions() {
       try {
-        const subscriptions = await getActiveSubscriptions(onboardingProfile.email);
+        const subscriptions = await getActiveSubscriptions(subscriptionLookup);
         if (cancelled) return;
 
         setSubscriptionState(
           new Set([
             ...activeSubscriptions,
+            ...(authContext.user?.subscription ? [authContext.user.subscription.toLowerCase()] : []),
             ...subscriptions.map((subscription) => subscription.plan_key.toLowerCase()),
           ]),
         );
       } catch {
         if (!cancelled) {
-          setSubscriptionState(new Set(activeSubscriptions));
+          setSubscriptionState(
+            new Set([
+              ...activeSubscriptions,
+              ...(authContext.user?.subscription ? [authContext.user.subscription.toLowerCase()] : []),
+            ]),
+          );
         }
       }
     }
@@ -572,7 +607,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [onboardingProfile.email, supabaseReady]);
+  }, [authContext.user?.subscription, canLoadSubscriptions, subscriptionLookup]);
 
   const rosterStatsByAthlete = useMemo(
     () => new Map(rosterStats.map((stats) => [stats.athlete_id, stats])),
@@ -633,10 +668,16 @@ export default function App() {
 
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
+      if (!authContext.user?.email) {
+        setCheckoutMessage('You must be logged in to subscribe. Please sign in or create an account to continue.');
+        return;
+      }
+
       setCheckoutMessage(null);
       await subscribeToCheckout({
         priceId: plan.priceId,
-        customerEmail: onboardingProfile.email,
+        userId: authContext.user.authSource === 'supabase' ? authContext.user.id : undefined,
+        customerEmail: authContext.user.email,
         planKey: plan.key,
       });
     } catch (error) {
@@ -651,7 +692,7 @@ export default function App() {
     }
 
     setSelectedAthleteId(athleteId);
-    setActiveScreen('profile');
+    navigate(getDashboardPath('profile'));
   }
 
   const onAthletePrimaryAction = useAthletePrimaryAction({
@@ -670,32 +711,47 @@ export default function App() {
 
   function handleOnboardingComplete(profile: OnboardingProfile) {
     setOnboardingProfile(profile);
-    setStage('dashboard');
-    setActiveScreen(profile.role === 'coach' ? 'coach' : profile.role === 'recruiter' ? 'recruiter' : 'athlete');
+    navigate(getDashboardPath(profile.role === 'coach' ? 'coach' : profile.role === 'recruiter' ? 'recruiter' : 'athlete'));
   }
 
-  if (stage === 'landing') {
+  if (pathname === '/') {
+    if (authContext.isAuthenticated) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
     return (
       <LandingPage
         plans={subscriptionPlans}
-        onGetStarted={() => setStage('onboarding')}
-        onViewPitch={() => setStage('pitch')}
+        onGetStarted={() => navigate('/onboarding')}
+        onViewPitch={() => navigate('/pitch')}
       />
     );
   }
 
-  if (stage === 'onboarding') {
+  if (pathname === '/login') {
+    if (authContext.isAuthenticated) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
+    return <Login />;
+  }
+
+  if (pathname === '/onboarding') {
     return (
       <OnboardingFlow
         value={onboardingProfile}
-        onBack={() => setStage('landing')}
+        onBack={() => navigate('/')}
         onComplete={handleOnboardingComplete}
       />
     );
   }
 
-  if (stage === 'pitch') {
-    return <InvestorPitchDeck slides={pitchSlides} onBack={() => setStage('landing')} onGetStarted={() => setStage('onboarding')} />;
+  if (pathname === '/pitch') {
+    return <InvestorPitchDeck slides={pitchSlides} onBack={() => navigate('/')} onGetStarted={() => navigate('/onboarding')} />;
+  }
+
+  if (!isDashboardPath) {
+    return <NotFoundState onReturn={() => navigate(authContext.isAuthenticated ? '/dashboard' : '/')} />;
   }
 
   return (
@@ -704,7 +760,7 @@ export default function App() {
       role={userRole}
       allowedRoles={allDashboardRoles}
       isLoading={authContext.isLoading || loadingUserRole}
-      fallback={<Login />}
+      redirectTo="/login"
       loadingFallback={
         <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
           <div className="mx-auto flex max-w-xl items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
@@ -797,7 +853,7 @@ export default function App() {
                     <button
                       key={screen.id}
                       type="button"
-                      onClick={() => setActiveScreen(screen.id)}
+                      onClick={() => navigate(getDashboardPath(screen.id))}
                       className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
                         screen.id === activeScreen
                           ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100'
@@ -837,13 +893,13 @@ export default function App() {
                 pipelineStatus={pipelineStatus}
                 subscriptionActive={athleteSubscriptionActive}
                 onPrimaryAction={onAthletePrimaryAction}
-                onOpenProfile={() => setActiveScreen('profile')}
+                onOpenProfile={() => navigate(getDashboardPath('profile'))}
               />
             ) : null}
 
             {activeScreen === 'coach' ? (
               <CoachDashboard
-                onEnterLiveMode={() => setActiveScreen('live')}
+                onEnterLiveMode={() => navigate(getDashboardPath('live'))}
                 players={playerRows}
                 performance={averageTeamScore}
                 insights={aiInsights}
@@ -1931,6 +1987,25 @@ function LoadingState({ label }: { label: string }) {
     <div className="flex items-center gap-3 text-sm text-slate-300">
       <div className="h-3 w-3 animate-pulse rounded-full bg-cyan-300" />
       {label}
+    </div>
+  );
+}
+
+function NotFoundState({ onReturn }: { onReturn: () => void }) {
+  return (
+    <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
+      <div className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+        <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Page not found</p>
+        <h1 className="mt-3 text-3xl font-semibold text-white">That route does not exist.</h1>
+        <p className="mt-3 text-sm text-slate-300">Return to a valid dashboard or landing page to continue.</p>
+        <button
+          type="button"
+          onClick={onReturn}
+          className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+        >
+          Go back
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '../shared/subscriptionStatuses.js';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -41,6 +42,12 @@ function mapSubscriptionRecord(sessionOrSubscription, statusOverride) {
     null;
 
   return {
+    user_id:
+      typeof metadata.userId === 'string' && metadata.userId.trim()
+        ? metadata.userId.trim()
+        : typeof sessionOrSubscription.client_reference_id === 'string' && sessionOrSubscription.client_reference_id.trim()
+          ? sessionOrSubscription.client_reference_id.trim()
+          : null,
     customer_email:
       normalizeEmail(sessionOrSubscription.customer_details?.email) ??
       normalizeEmail(sessionOrSubscription.customer_email) ??
@@ -63,6 +70,63 @@ function mapSubscriptionRecord(sessionOrSubscription, statusOverride) {
     current_period_end: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
     updated_at: new Date().toISOString(),
   };
+}
+
+async function resolveProfileIdentifiers(supabaseAdmin, {
+  userId,
+  customerEmail,
+}) {
+  if (userId) {
+    const { data } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (data) {
+      return {
+        userId: data.id,
+        customerEmail: normalizeEmail(data.email) ?? customerEmail,
+      };
+    }
+  }
+
+  if (customerEmail) {
+    const { data } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email')
+      .eq('email', customerEmail)
+      .maybeSingle();
+
+    if (data) {
+      return {
+        userId: data.id,
+        customerEmail: normalizeEmail(data.email) ?? customerEmail,
+      };
+    }
+  }
+
+  return { userId: userId ?? null, customerEmail };
+}
+
+async function syncProfileSubscription(supabaseAdmin, userId, record) {
+  if (!userId) {
+    return;
+  }
+
+  const subscriptionValue = getProfileSubscriptionValue(record);
+
+  await supabaseAdmin
+    .from('profiles')
+    .update({
+      subscription: subscriptionValue,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+}
+
+function getProfileSubscriptionValue(record) {
+  return ACTIVE_SUBSCRIPTION_STATUSES.includes(record.status) ? record.plan_key : null;
 }
 
 export default async function handler(req, res) {
@@ -94,13 +158,24 @@ export default async function handler(req, res) {
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      const record = mapSubscriptionRecord(session, 'active');
+      const mappedRecord = mapSubscriptionRecord(session, 'active');
+      const profileIdentifiers = await resolveProfileIdentifiers(supabaseAdmin, {
+        userId: mappedRecord.user_id,
+        customerEmail: mappedRecord.customer_email,
+      });
+      const record = {
+        ...mappedRecord,
+        user_id: profileIdentifiers.userId,
+        customer_email: profileIdentifiers.customerEmail,
+      };
 
       if (record.customer_email) {
         await supabaseAdmin.from('subscriptions').upsert(record, {
           onConflict: 'stripe_subscription_id',
         });
       }
+
+      await syncProfileSubscription(supabaseAdmin, record.user_id, record);
     }
 
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
@@ -115,15 +190,21 @@ export default async function handler(req, res) {
         }
       }
 
+      const mappedRecord = mapSubscriptionRecord(
+        {
+          ...subscription,
+          customer_email: customerEmail,
+        },
+        subscription.status,
+      );
+      const profileIdentifiers = await resolveProfileIdentifiers(supabaseAdmin, {
+        userId: mappedRecord.user_id,
+        customerEmail: customerEmail,
+      });
       const record = {
-        ...mapSubscriptionRecord(
-          {
-            ...subscription,
-            customer_email: customerEmail,
-          },
-          subscription.status,
-        ),
-        customer_email: customerEmail,
+        ...mappedRecord,
+        user_id: profileIdentifiers.userId,
+        customer_email: profileIdentifiers.customerEmail,
       };
 
       if (record.customer_email) {
@@ -131,6 +212,8 @@ export default async function handler(req, res) {
           onConflict: 'stripe_subscription_id',
         });
       }
+
+      await syncProfileSubscription(supabaseAdmin, record.user_id, record);
     }
 
     res.status(200).json({ received: true });

@@ -43,6 +43,7 @@ function toAuthUser(user: RegisteredUser): AuthUser {
     name: user.name,
     avatar: user.avatar,
     role: user.role,
+    subscription: null,
     email: user.email,
     teamId: user.teamId,
     authSource: 'firestore',
@@ -58,6 +59,7 @@ function toSupabaseAuthUser(user: SupabaseUser): AuthUser {
     name: fallbackName,
     avatar: metadata.avatar ?? getInitials(fallbackName),
     role: metadata.role ?? 'Athlete',
+    subscription: typeof metadata.subscription === 'string' ? metadata.subscription : null,
     email: user.email ?? '',
     teamId: metadata.teamId ?? '',
     authSource: 'supabase',
@@ -78,6 +80,45 @@ function formatRoleLabel(role: AppUserRole) {
   }
 }
 
+function toSupabaseErrorMessage(error: { message?: string } | null | undefined, fallback: string) {
+  const message = error?.message?.trim();
+  return message ? message : fallback;
+}
+
+function normalizeEmailAddress(value?: string | null) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+async function upsertSupabaseProfile(user: SupabaseUser, {
+  email,
+  name,
+  role,
+  teamId,
+}: {
+  email: string;
+  name: string;
+  role: AppUserRole;
+  teamId?: string | null;
+}) {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase.from('profiles').upsert({
+    id: user.id,
+    email,
+    full_name: name,
+    role,
+    team_id: teamId ?? null,
+  }, {
+    onConflict: 'id',
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 async function resolveSupabaseAuthUser(user: SupabaseUser) {
   const authUser = toSupabaseAuthUser(user);
 
@@ -87,7 +128,7 @@ async function resolveSupabaseAuthUser(user: SupabaseUser) {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, subscription')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -97,14 +138,19 @@ async function resolveSupabaseAuthUser(user: SupabaseUser) {
   }
 
   const normalizedRole = normalizeUserRole(data?.role);
+  const profileSubscription = typeof data?.subscription === 'string' ? data.subscription : null;
 
   if (!normalizedRole) {
-    return authUser;
+    return {
+      ...authUser,
+      subscription: profileSubscription,
+    };
   }
 
   return {
     ...authUser,
     role: formatRoleLabel(normalizedRole),
+    subscription: profileSubscription,
   };
 }
 
@@ -211,11 +257,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [adminTeamId, isAdmin]);
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
+    const normalizedEmail = normalizeEmailAddress(email);
+
     try {
-      const dbUser = await getUserByEmail(email.trim());
+      let supabaseLoginError: string | null = null;
+
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (data.user) {
+          setUser(await resolveSupabaseAuthUser(data.user));
+          return { success: true };
+        }
+
+        if (error) {
+          supabaseLoginError = toSupabaseErrorMessage(error, 'Unable to sign in with Supabase.');
+        }
+      }
+
+      const dbUser = await getUserByEmail(normalizedEmail);
 
       if (!dbUser) {
-        return { success: false, message: 'No account found with that email address.' };
+        return { success: false, message: supabaseLoginError ?? 'No account found with that email address.' };
       }
 
       const passwordOk = await verifyPassword(password, dbUser.passwordHash, dbUser.passwordSalt);
@@ -257,7 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let teamAdminEmail: string | undefined;
       let returnedTeamCode: string | undefined;
 
-      const emailNorm = fields.email.toLowerCase().trim();
+      const emailNorm = normalizeEmailAddress(fields.email);
       const isAdminEmail = !!ADMIN_EMAIL_ENV && emailNorm === ADMIN_EMAIL_ENV;
 
       if (fields.teamCode) {
@@ -279,9 +345,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const shouldAutoApprove = isTeamCreator || isAdminEmail;
+      const requestedRole = normalizeUserRole(fields.role);
+      const normalizedRole = shouldAutoApprove ? 'admin' : requestedRole ?? 'athlete';
+      const legacyRole = formatRoleLabel(normalizedRole);
       const settings = await getAppSettings();
+
+      if (!shouldAutoApprove && !requestedRole) {
+        console.warn(`Unknown role "${fields.role}" provided during signup. Defaulting to athlete role. Please verify the role value matches expected options.`);
+      }
+
+      if (supabase) {
+        const displayName = fields.name.trim();
+        const { data, error } = await supabase.auth.signUp({
+          email: emailNorm,
+          password: fields.password,
+          options: {
+            data: {
+              name: displayName,
+              avatar: getInitials(displayName),
+              role: normalizedRole,
+              teamId,
+            },
+          },
+        });
+
+        if (error || !data.user) {
+          return {
+            success: false,
+            message: toSupabaseErrorMessage(error, 'Unable to create your account.'),
+          };
+        }
+
+        await upsertSupabaseProfile(data.user, {
+          email: emailNorm,
+          name: displayName,
+          role: normalizedRole,
+          teamId,
+        });
+
+        if (data.session?.user) {
+          setUser(await resolveSupabaseAuthUser(data.session.user));
+        }
+
+        return {
+          success: true,
+          emailSent: true,
+          autoApproved: true,
+          teamCode: returnedTeamCode,
+          isAdminRegistration: normalizedRole === 'admin',
+        };
+      }
+
       const newUser = await createRegistration(
-        { ...fields, teamId, role: shouldAutoApprove ? 'Admin' : fields.role },
+        { ...fields, teamId, role: legacyRole },
         shouldAutoApprove,
         settings.requireApproval,
       );

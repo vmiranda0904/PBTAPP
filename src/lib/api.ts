@@ -1,4 +1,5 @@
 import { hasSupabaseConfig, supabase } from './supabase';
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '../../shared/subscriptionStatuses';
 
 export type AthleteRecord = {
   id: string;
@@ -19,6 +20,7 @@ export type StatsRecord = {
 
 export type SubscriptionRecord = {
   id: string;
+  user_id: string | null;
   customer_email: string;
   plan_key: string;
   status: string;
@@ -85,15 +87,31 @@ export async function getStatsForAthletes(athleteIds: string[]) {
   return (data as StatsRecord[] | null) ?? [];
 }
 
-export async function getActiveSubscriptions(customerEmail: string) {
-  if (!customerEmail.trim()) return [];
+export async function getActiveSubscriptions({
+  userId,
+  customerEmail,
+}: {
+  userId?: string | null;
+  customerEmail?: string | null;
+}) {
+  const normalizedEmail = customerEmail?.trim().toLowerCase() ?? '';
+  if (!userId && !normalizedEmail) return [];
 
   const client = requireSupabase();
-  const { data, error } = await client
+  let query = client
     .from('subscriptions')
     .select('*')
-    .eq('customer_email', customerEmail.trim().toLowerCase())
-    .in('status', ['active', 'trialing']);
+    .in('status', ACTIVE_SUBSCRIPTION_STATUSES);
+
+  if (userId) {
+    query = query.eq('user_id', userId);
+  } else if (normalizedEmail) {
+    query = query.eq('customer_email', normalizedEmail);
+  } else {
+    return [];
+  }
+
+  const { data, error } = await query;
 
   if (error && error.code !== 'PGRST116') throw error;
   return (data as SubscriptionRecord[] | null) ?? [];

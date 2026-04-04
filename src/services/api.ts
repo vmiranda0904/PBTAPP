@@ -33,9 +33,9 @@ export async function getStatsForAthletes(athletes: AthleteRecord[]) {
   return getStatsForAthletesFromLib(athletes.map((athlete) => athlete.id));
 }
 
-export async function getActiveSubscriptions(customerEmail: string) {
+export async function getActiveSubscriptions(args: Parameters<typeof getActiveSubscriptionsFromLib>[0]) {
   if (!supabase) return [];
-  return getActiveSubscriptionsFromLib(customerEmail);
+  return getActiveSubscriptionsFromLib(args);
 }
 
 export async function subscribeToCheckout(args: Parameters<typeof subscribeToCheckoutFromLib>[0]) {

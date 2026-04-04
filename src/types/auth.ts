@@ -3,6 +3,7 @@ export interface AuthUser {
   name: string;
   avatar: string;
   role: string;
+  subscription: string | null;
   email: string;
   teamId: string;
   authSource: 'firestore' | 'supabase';
