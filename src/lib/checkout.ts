@@ -2,11 +2,12 @@ const checkoutEndpoint = import.meta.env.VITE_CHECKOUT_API_URL || '/api/checkout
 
 type CheckoutRequest = {
   priceId?: string;
+  userId?: string;
   customerEmail?: string;
   planKey?: string;
 };
 
-export async function subscribeToCheckout({ priceId, customerEmail, planKey }: CheckoutRequest) {
+export async function subscribeToCheckout({ priceId, userId, customerEmail, planKey }: CheckoutRequest) {
   if (!priceId) {
     throw new Error('Missing Stripe price ID for this subscription tier.');
   }
@@ -16,7 +17,7 @@ export async function subscribeToCheckout({ priceId, customerEmail, planKey }: C
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ priceId, customerEmail, planKey }),
+    body: JSON.stringify({ priceId, userId, customerEmail, planKey }),
   });
 
   if (!response.ok) {

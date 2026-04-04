@@ -563,7 +563,7 @@ export default function App() {
   }, [aiPipelineUrl]);
 
   useEffect(() => {
-    if (!supabaseReady || !onboardingProfile.email.trim()) {
+    if (!supabaseReady || (!authContext.user?.id && !authContext.user?.email)) {
       setSubscriptionState(new Set(activeSubscriptions));
       return;
     }
@@ -572,18 +572,27 @@ export default function App() {
 
     async function loadSubscriptions() {
       try {
-        const subscriptions = await getActiveSubscriptions(onboardingProfile.email);
+        const subscriptions = await getActiveSubscriptions({
+          userId: authContext.user?.authSource === 'supabase' ? authContext.user.id : null,
+          customerEmail: authContext.user?.email ?? onboardingProfile.email,
+        });
         if (cancelled) return;
 
         setSubscriptionState(
           new Set([
             ...activeSubscriptions,
+            ...(authContext.user?.subscription ? [authContext.user.subscription.toLowerCase()] : []),
             ...subscriptions.map((subscription) => subscription.plan_key.toLowerCase()),
           ]),
         );
       } catch {
         if (!cancelled) {
-          setSubscriptionState(new Set(activeSubscriptions));
+          setSubscriptionState(
+            new Set([
+              ...activeSubscriptions,
+              ...(authContext.user?.subscription ? [authContext.user.subscription.toLowerCase()] : []),
+            ]),
+          );
         }
       }
     }
@@ -593,7 +602,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [onboardingProfile.email, supabaseReady]);
+  }, [authContext.user?.authSource, authContext.user?.email, authContext.user?.id, authContext.user?.subscription, onboardingProfile.email, supabaseReady]);
 
   const rosterStatsByAthlete = useMemo(
     () => new Map(rosterStats.map((stats) => [stats.athlete_id, stats])),
@@ -654,10 +663,15 @@ export default function App() {
 
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
+      if (!authContext.user?.email) {
+        throw new Error('Sign in before starting Stripe checkout.');
+      }
+
       setCheckoutMessage(null);
       await subscribeToCheckout({
         priceId: plan.priceId,
-        customerEmail: onboardingProfile.email,
+        userId: authContext.user.authSource === 'supabase' ? authContext.user.id : undefined,
+        customerEmail: authContext.user.email,
         planKey: plan.key,
       });
     } catch (error) {

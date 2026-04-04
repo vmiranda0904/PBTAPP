@@ -43,6 +43,7 @@ function toAuthUser(user: RegisteredUser): AuthUser {
     name: user.name,
     avatar: user.avatar,
     role: user.role,
+    subscription: null,
     email: user.email,
     teamId: user.teamId,
     authSource: 'firestore',
@@ -58,6 +59,7 @@ function toSupabaseAuthUser(user: SupabaseUser): AuthUser {
     name: fallbackName,
     avatar: metadata.avatar ?? getInitials(fallbackName),
     role: metadata.role ?? 'Athlete',
+    subscription: typeof metadata.subscription === 'string' ? metadata.subscription : null,
     email: user.email ?? '',
     teamId: metadata.teamId ?? '',
     authSource: 'supabase',
@@ -107,6 +109,7 @@ async function upsertSupabaseProfile(user: SupabaseUser, {
     email,
     full_name: name,
     role,
+    subscription: null,
     team_id: teamId ?? null,
   }, {
     onConflict: 'id',
@@ -126,7 +129,7 @@ async function resolveSupabaseAuthUser(user: SupabaseUser) {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, subscription')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -136,14 +139,19 @@ async function resolveSupabaseAuthUser(user: SupabaseUser) {
   }
 
   const normalizedRole = normalizeUserRole(data?.role);
+  const profileSubscription = typeof data?.subscription === 'string' ? data.subscription : null;
 
   if (!normalizedRole) {
-    return authUser;
+    return {
+      ...authUser,
+      subscription: profileSubscription,
+    };
   }
 
   return {
     ...authUser,
     role: formatRoleLabel(normalizedRole),
+    subscription: profileSubscription,
   };
 }
 
