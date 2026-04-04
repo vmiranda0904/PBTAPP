@@ -664,7 +664,7 @@ export default function App() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
       if (!authContext.user?.email) {
-        throw new Error('Sign in before starting Stripe checkout.');
+        throw new Error('User email is required to start checkout.');
       }
 
       setCheckoutMessage(null);

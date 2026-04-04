@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     const resolvedProfile = await resolveProfileIdentifiers({ userId, customerEmail });
 
     if (!resolvedProfile.customerEmail) {
-      res.status(400).json({ error: 'Missing customerEmail.' });
+      res.status(400).json({ error: 'Unable to determine customer email for checkout.' });
       return;
     }
 

@@ -49,9 +49,6 @@ create table if not exists subscriptions (
 create index if not exists subscriptions_customer_email_idx on subscriptions (customer_email);
 create index if not exists subscriptions_user_id_idx on subscriptions (user_id);
 
-alter table if exists profiles add column if not exists subscription text;
-alter table if exists subscriptions add column if not exists user_id uuid references profiles(id) on delete cascade;
-
 create table if not exists jobs (
   id uuid primary key,
   user_id text not null,
