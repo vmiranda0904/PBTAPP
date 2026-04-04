@@ -1,4 +1,5 @@
 import { hasSupabaseConfig, supabase } from './supabase';
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '../../shared/subscriptionStatuses';
 
 export type AthleteRecord = {
   id: string;
@@ -100,7 +101,7 @@ export async function getActiveSubscriptions({
   let query = client
     .from('subscriptions')
     .select('*')
-    .in('status', ['active', 'trialing']);
+    .in('status', ACTIVE_SUBSCRIPTION_STATUSES);
 
   query = userId ? query.eq('user_id', userId) : query.eq('customer_email', normalizedEmail);
 

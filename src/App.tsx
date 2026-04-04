@@ -381,6 +381,14 @@ export default function App() {
   const recruiterSubscriptionActive = subscriptionState.has('recruiter');
   const allowedScreens = useMemo(() => getAllowedScreensForRole(userRole), [userRole]);
   const roleFilteredScreens = useMemo(() => screens.filter((screen) => allowedScreens.includes(screen.id)), [allowedScreens]);
+  const subscriptionLookup = useMemo(
+    () => ({
+      userId: authContext.user?.authSource === 'supabase' ? authContext.user.id : null,
+      customerEmail: authContext.user?.email ?? onboardingProfile.email,
+    }),
+    [authContext.user?.authSource, authContext.user?.email, authContext.user?.id, onboardingProfile.email],
+  );
+  const canLoadSubscriptions = supabaseReady && Boolean(subscriptionLookup.userId || subscriptionLookup.customerEmail);
   const pathname = location.pathname.replace(/\/+$/, '') || '/';
   const requestedScreen = getDashboardScreenFromPath(pathname);
   const defaultScreen = getDefaultScreenForRole(userRole);
@@ -563,7 +571,7 @@ export default function App() {
   }, [aiPipelineUrl]);
 
   useEffect(() => {
-    if (!supabaseReady || (!authContext.user?.id && !authContext.user?.email)) {
+    if (!canLoadSubscriptions) {
       setSubscriptionState(new Set(activeSubscriptions));
       return;
     }
@@ -572,10 +580,7 @@ export default function App() {
 
     async function loadSubscriptions() {
       try {
-        const subscriptions = await getActiveSubscriptions({
-          userId: authContext.user?.authSource === 'supabase' ? authContext.user.id : null,
-          customerEmail: authContext.user?.email ?? onboardingProfile.email,
-        });
+        const subscriptions = await getActiveSubscriptions(subscriptionLookup);
         if (cancelled) return;
 
         setSubscriptionState(
@@ -602,7 +607,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authContext.user?.authSource, authContext.user?.email, authContext.user?.id, authContext.user?.subscription, onboardingProfile.email, supabaseReady]);
+  }, [authContext.user?.subscription, canLoadSubscriptions, subscriptionLookup]);
 
   const rosterStatsByAthlete = useMemo(
     () => new Map(rosterStats.map((stats) => [stats.athlete_id, stats])),
@@ -664,7 +669,7 @@ export default function App() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
       if (!authContext.user?.email) {
-        throw new Error('User email is required to start checkout.');
+        throw new Error('Please ensure you are logged in with a valid email address to proceed with checkout.');
       }
 
       setCheckoutMessage(null);

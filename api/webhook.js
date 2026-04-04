@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '../shared/subscriptionStatuses.js';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -113,7 +114,7 @@ async function syncProfileSubscription(supabaseAdmin, userId, record) {
     return;
   }
 
-  const subscriptionValue = ['active', 'trialing'].includes(record.status) ? record.plan_key : null;
+  const subscriptionValue = ACTIVE_SUBSCRIPTION_STATUSES.includes(record.status) ? record.plan_key : null;
 
   await supabaseAdmin
     .from('profiles')

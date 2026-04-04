@@ -109,7 +109,6 @@ async function upsertSupabaseProfile(user: SupabaseUser, {
     email,
     full_name: name,
     role,
-    subscription: null,
     team_id: teamId ?? null,
   }, {
     onConflict: 'id',
