@@ -85,8 +85,8 @@ function toSupabaseErrorMessage(error: { message?: string } | null | undefined, 
   return message ? message : fallback;
 }
 
-function normalizeEmailAddress(value: string) {
-  return value.trim().toLowerCase();
+function normalizeEmailAddress(value?: string | null) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
 async function upsertSupabaseProfile(user: SupabaseUser, {

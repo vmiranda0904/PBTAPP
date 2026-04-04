@@ -669,7 +669,8 @@ export default function App() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
       if (!authContext.user?.email) {
-        throw new Error('Please ensure you are logged in with a valid email address to proceed with checkout.');
+        setCheckoutMessage('Please ensure you are logged in with a valid email address to proceed with checkout.');
+        return;
       }
 
       setCheckoutMessage(null);
@@ -750,7 +751,7 @@ export default function App() {
   }
 
   if (!isDashboardPath) {
-    return <Navigate to={authContext.isAuthenticated ? '/dashboard' : '/'} replace />;
+    return <NotFoundState onReturn={() => navigate(authContext.isAuthenticated ? '/dashboard' : '/')} />;
   }
 
   return (
@@ -1986,6 +1987,25 @@ function LoadingState({ label }: { label: string }) {
     <div className="flex items-center gap-3 text-sm text-slate-300">
       <div className="h-3 w-3 animate-pulse rounded-full bg-cyan-300" />
       {label}
+    </div>
+  );
+}
+
+function NotFoundState({ onReturn }: { onReturn: () => void }) {
+  return (
+    <div className="min-h-screen bg-slate-950 px-4 py-10 text-slate-50">
+      <div className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+        <p className="text-sm uppercase tracking-[0.28em] text-cyan-200">Page not found</p>
+        <h1 className="mt-3 text-3xl font-semibold text-white">That route does not exist.</h1>
+        <p className="mt-3 text-sm text-slate-300">Return to a valid dashboard or landing page to continue.</p>
+        <button
+          type="button"
+          onClick={onReturn}
+          className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+        >
+          Go back
+        </button>
+      </div>
     </div>
   );
 }

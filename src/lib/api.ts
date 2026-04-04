@@ -103,7 +103,13 @@ export async function getActiveSubscriptions({
     .select('*')
     .in('status', ACTIVE_SUBSCRIPTION_STATUSES);
 
-  query = userId ? query.eq('user_id', userId) : query.eq('customer_email', normalizedEmail);
+  if (userId) {
+    query = query.eq('user_id', userId);
+  } else if (normalizedEmail) {
+    query = query.eq('customer_email', normalizedEmail);
+  } else {
+    return [];
+  }
 
   const { data, error } = await query;
 

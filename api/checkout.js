@@ -9,6 +9,10 @@ function normalizeEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : undefined;
 }
 
+function isUuid(value) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function getSupabaseAdmin() {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     return null;
@@ -85,6 +89,11 @@ export default async function handler(req, res) {
 
   if (!priceId) {
     res.status(400).json({ error: 'Missing priceId.' });
+    return;
+  }
+
+  if (userId && !isUuid(userId)) {
+    res.status(400).json({ error: 'Invalid userId.' });
     return;
   }
 

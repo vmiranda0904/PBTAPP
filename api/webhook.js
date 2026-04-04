@@ -114,7 +114,7 @@ async function syncProfileSubscription(supabaseAdmin, userId, record) {
     return;
   }
 
-  const subscriptionValue = ACTIVE_SUBSCRIPTION_STATUSES.includes(record.status) ? record.plan_key : null;
+  const subscriptionValue = getProfileSubscriptionValue(record);
 
   await supabaseAdmin
     .from('profiles')
@@ -123,6 +123,10 @@ async function syncProfileSubscription(supabaseAdmin, userId, record) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+}
+
+function getProfileSubscriptionValue(record) {
+  return ACTIVE_SUBSCRIPTION_STATUSES.includes(record.status) ? record.plan_key : null;
 }
 
 export default async function handler(req, res) {
