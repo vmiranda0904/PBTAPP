@@ -669,7 +669,7 @@ export default function App() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     try {
       if (!authContext.user?.email) {
-        setCheckoutMessage('Please ensure you are logged in with a valid email address to proceed with checkout.');
+        setCheckoutMessage('You must be logged in to subscribe. Please sign in or create an account to continue.');
         return;
       }
 

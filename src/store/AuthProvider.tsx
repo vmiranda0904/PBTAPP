@@ -351,7 +351,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const settings = await getAppSettings();
 
       if (!shouldAutoApprove && !requestedRole) {
-        console.warn(`Unknown signup role "${fields.role}" received; defaulting to athlete.`);
+        console.warn(`Unknown role "${fields.role}" provided during signup. Defaulting to athlete role. Please verify the role value matches expected options.`);
       }
 
       if (supabase) {

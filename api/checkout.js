@@ -93,7 +93,7 @@ export default async function handler(req, res) {
   }
 
   if (userId && !isUuid(userId)) {
-    res.status(400).json({ error: 'Invalid userId.' });
+    res.status(400).json({ error: 'The provided userId is not a valid UUID format.' });
     return;
   }
 
